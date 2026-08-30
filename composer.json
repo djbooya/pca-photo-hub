@@ -1,0 +1,21 @@
+{
+  "name": "diablo-pca/photo-hub",
+  "description": "PCA Photo Hub - File sharing platform for Porsche Club of America Diablo Region",
+  "type": "project",
+  "require": {
+    "php": ">=7.4",
+    "google/apiclient": "^2.15",
+    "symfony/dotenv": "^5.4"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "PCAPhotoHub\\": "src/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}
