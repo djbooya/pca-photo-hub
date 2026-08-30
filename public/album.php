@@ -234,6 +234,10 @@ try {
             <p class="footer-copyright">
                 © 2026 Porsche Club of America - Diablo Region. All rights reserved.
             </p>
+            <p style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-top: 1rem;">
+                <strong><?php echo htmlspecialchars($config['app']['name']); ?></strong> v<?php echo $config['app']['version']; ?> |
+                <a href="https://github.com/djbooya/pca-photo-hub" target="_blank" style="color: rgba(255, 255, 255, 0.8);">GitHub</a>
+            </p>
         </div>
     </footer>
 

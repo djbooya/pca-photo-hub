@@ -293,14 +293,34 @@ Album configuration is stored in a Google Sheet with these columns:
 - Check `BASE_URL` in `.env`
 - Clear browser cookies and try again
 
+## Release Notes
+
+### v1.0.0 (Aug 30, 2026)
+- **Added:** Complete photo-sharing platform with drag-and-drop upload
+- **Added:** Password-protected album support
+- **Added:** User file deletion tracking with 7-day window
+- **Added:** Google Drive and Google Sheets integration
+- **Added:** Mobile-responsive design with Diablo PCA branding
+- **Added:** Comprehensive documentation and deployment guides
+- **Added:** Session management with UUID-based user tracking
+- **Added:** Album visibility control via date ranges in Sheets
+- **Added:** Multi-file upload with progress tracking
+- **Features:** JPG/PNG/WebP support, max 25 MB per file
+- **Status:** Production Ready ✅
+- **Repository:** [GitHub - PCA Photo Hub](https://github.com/djbooya/pca-photo-hub)
+
 ## Future Enhancements
 
 - [ ] Bulk download as ZIP
 - [ ] Image tagging/metadata
-- [ ] Facebook auto-posting
-- [ ] Advanced analytics
-- [ ] Rate limiting
-- [ ] Database storage for metadata (instead of JSON)
+- [ ] Facebook auto-posting integration
+- [ ] Advanced analytics and statistics
+- [ ] Rate limiting per IP
+- [ ] Database storage for metadata (PostgreSQL/MySQL)
+- [ ] Image compression on upload
+- [ ] WebP conversion for browser optimization
+- [ ] Advanced search and filtering
+- [ ] Batch operations (select multiple for delete)
 
 ## License
 
@@ -309,3 +329,7 @@ Album configuration is stored in a Google Sheet with these columns:
 ## Support
 
 For issues or questions, contact the Diablo Region PCA administrators.
+
+---
+
+**Version:** 1.0.0 | **Last Updated:** Aug 30, 2026 | **Status:** Production Ready ✅
