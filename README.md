@@ -303,6 +303,13 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.0.8 (Sep 7, 2026)
+- **Fixed:** Homepage silently stopped rendering right after "Select an event below to upload your photos" whenever an album's dates were served from `storage/cache/albums.json` instead of a fresh Sheets fetch -- a fatal error with `display_errors` off, so the page just truncated with no visible error
+- **Root cause:** `GoogleSheetsManager` parsed the Sheet's date columns into `DateTime` objects and then `json_encode()`'d them straight into the cache file. A `DateTime` object round-tripped through JSON does not come back as a `DateTime` -- it comes back as a plain array of its internal representation. On the next request served from cache, `AlbumManager` called `->format()`/`->diff()` on that array and fatal-errored mid-render.
+- **Fixed:** Dates are now stored as plain strings in `GoogleSheetsManager` (and therefore in the JSON cache); `AlbumManager` parses them into `DateTime` objects itself, in memory, on every request -- never storing the objects back into anything that gets serialized
+- **Hardened:** The new date parser also tolerates a stale pre-fix cache file (which still has the broken array shape) by logging a warning and treating it as unset, instead of crashing on a `TypeError`
+- **Note:** After deploying, delete `storage/cache/albums.json` (or wait 5 minutes for it to expire) so a fresh, correctly-shaped cache is written
+
 ### v1.0.7 (Sep 7, 2026)
 - **Fixed:** Root folder and album folders returning zero results (`listRootFolders succeeded {"folder_count":0}` in the debug log) when the root folder lives inside a **Shared Drive** rather than a personal "My Drive" -- Google Drive's `files.list` silently scopes to "My Drive" only unless `supportsAllDrives` and `includeItemsFromAllDrives` are explicitly passed, regardless of sharing permissions being correct
 - **Fixed:** Added `supportsAllDrives: true` to every Drive API call (list, upload, delete, get metadata, create folder) so the app works correctly with folders/files stored in a Shared Drive
@@ -378,4 +385,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.7 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.8 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

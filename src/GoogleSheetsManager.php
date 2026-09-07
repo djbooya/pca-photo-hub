@@ -148,11 +148,19 @@ class GoogleSheetsManager
                     continue; // Skip empty rows
                 }
 
+                // Dates are kept as raw strings here, not DateTime objects.
+                // This array gets json_encode()'d into storage/cache/albums.json;
+                // a DateTime object round-tripped through JSON comes back as a
+                // plain array (its internal {date, timezone_type, timezone}
+                // representation), not a DateTime, which fatals as soon as
+                // AlbumManager calls ->format() or ->diff() on it after a cache
+                // hit. AlbumManager parses these strings into DateTime objects
+                // itself, in memory, on every request.
                 $album = [
                     'name' => $row[0] ?? '',
                     'password' => $row[1] ?? '',
-                    'upload_start' => isset($row[2]) ? $this->parseDate($row[2]) : null,
-                    'upload_end' => isset($row[3]) ? $this->parseDate($row[3]) : null,
+                    'upload_start' => (isset($row[2]) && trim($row[2]) !== '') ? trim($row[2]) : null,
+                    'upload_end' => (isset($row[3]) && trim($row[3]) !== '') ? trim($row[3]) : null,
                     'notes' => $row[4] ?? '',
                     'folder_id' => null, // Will be populated by AlbumManager
                 ];
@@ -170,18 +178,6 @@ class GoogleSheetsManager
                 'raw_error' => substr($e->getMessage(), 0, 2000),
             ]);
             throw new \Exception('Failed to fetch album config: ' . ErrorSummarizer::summarize($e->getMessage()));
-        }
-    }
-
-    /**
-     * Parse date string to DateTime object
-     */
-    private function parseDate($dateString)
-    {
-        try {
-            return new \DateTime($dateString, new \DateTimeZone($this->config['app']['timezone']));
-        } catch (\Exception $e) {
-            return null;
         }
     }
 

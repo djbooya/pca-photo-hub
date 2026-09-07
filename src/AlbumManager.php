@@ -39,8 +39,45 @@ class AlbumManager
         foreach ($sheetsAlbums as $album) {
             if (isset($folderMap[$album['name']])) {
                 $album['folder_id'] = $folderMap[$album['name']];
+                // Sheets/cache store dates as plain strings (see
+                // GoogleSheetsManager) -- parse them into DateTime objects
+                // here, in memory, on every request. Never store the
+                // DateTime objects themselves back into anything that gets
+                // json_encode()'d, or they come back as plain arrays on the
+                // next read and fatal on ->format()/->diff().
+                $album['upload_start'] = $this->parseDate($album['upload_start']);
+                $album['upload_end'] = $this->parseDate($album['upload_end']);
                 $this->albums[] = $album;
             }
+        }
+    }
+
+    /**
+     * Parse a raw date string (e.g. "2026-03-01") into a DateTime in the
+     * app's configured timezone. Returns null for empty/invalid input.
+     */
+    private function parseDate($dateString)
+    {
+        if (empty($dateString) || !is_string($dateString)) {
+            if (!empty($dateString)) {
+                // Most likely a stale cache from before dates were stored as
+                // strings (an old albums.json still has the JSON-serialized
+                // DateTime shape). Not a string, so not safely parseable --
+                // log it and move on instead of letting DateTime's
+                // constructor throw a TypeError that catch(\Exception) won't
+                // catch.
+                Logger::warning('AlbumManager: expected a date string but got something else -- clear storage/cache/albums.json', [
+                    'type' => gettype($dateString),
+                ]);
+            }
+            return null;
+        }
+
+        try {
+            return new \DateTime($dateString, new \DateTimeZone($this->config['app']['timezone']));
+        } catch (\Throwable $e) {
+            Logger::warning('AlbumManager: could not parse date', ['value' => $dateString]);
+            return null;
         }
     }
 
