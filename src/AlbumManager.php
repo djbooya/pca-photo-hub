@@ -34,21 +34,50 @@ class AlbumManager
             $folderMap[$folder->getName()] = $folder->getId();
         }
 
+        $now = new \DateTime('now', new \DateTimeZone($this->config['app']['timezone']));
+
         // Match sheets albums with drive folders
         $this->albums = [];
         foreach ($sheetsAlbums as $album) {
-            if (isset($folderMap[$album['name']])) {
-                $album['folder_id'] = $folderMap[$album['name']];
-                // Sheets/cache store dates as plain strings (see
-                // GoogleSheetsManager) -- parse them into DateTime objects
-                // here, in memory, on every request. Never store the
-                // DateTime objects themselves back into anything that gets
-                // json_encode()'d, or they come back as plain arrays on the
-                // next read and fatal on ->format()/->diff().
-                $album['upload_start'] = $this->parseDate($album['upload_start']);
-                $album['upload_end'] = $this->parseDate($album['upload_end']);
-                $this->albums[] = $album;
+            // Sheets/cache store dates as plain strings (see
+            // GoogleSheetsManager) -- parse them into DateTime objects here,
+            // in memory, on every request. Never store the DateTime objects
+            // themselves back into anything that gets json_encode()'d, or
+            // they come back as plain arrays on the next read and fatal on
+            // ->format()/->diff().
+            $album['upload_start'] = $this->parseDate($album['upload_start']);
+            $album['upload_end'] = $this->parseDate($album['upload_end']);
+
+            $folderId = $folderMap[$album['name']] ?? null;
+
+            if ($folderId === null) {
+                // Configured in Sheets but no matching Drive folder yet.
+                // Create one automatically -- but only if the album hasn't
+                // already closed for uploads; no point creating a folder
+                // for an album whose window has already passed.
+                $alreadyClosed = $album['upload_end'] !== null && $now > $album['upload_end'];
+
+                if ($alreadyClosed) {
+                    continue;
+                }
+
+                try {
+                    Logger::info('AlbumManager: no Drive folder found for configured album, creating it', ['name' => $album['name']]);
+                    $rootFolderId = $this->config['google']['drive']['root_folder_id'];
+                    $created = $this->driveManager->createFolder($album['name'], $rootFolderId);
+                    $folderId = $created['id'];
+                    Logger::info('AlbumManager: created Drive folder', ['name' => $album['name'], 'folder_id' => $folderId]);
+                } catch (\Throwable $e) {
+                    Logger::error('AlbumManager: failed to auto-create Drive folder', [
+                        'name' => $album['name'],
+                        'message' => $e->getMessage(),
+                    ]);
+                    continue; // Skip for this request; will retry on the next page load
+                }
             }
+
+            $album['folder_id'] = $folderId;
+            $this->albums[] = $album;
         }
     }
 

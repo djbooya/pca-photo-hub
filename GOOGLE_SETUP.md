@@ -128,17 +128,14 @@ Add 2-3 sample albums as rows:
 
 ---
 
-## Create Google Drive Folders for Albums
+## Google Drive Folders for Albums
 
-For each album in your Sheets, create a matching folder in Google Drive under your PCA Photo Hub root folder:
+As of v1.1.0, you **don't need to manually create a folder for each album**. The first time a page loads an album from your Sheet that doesn't yet have a matching Drive folder (and its upload end date hasn't passed), the app creates that folder automatically under your root folder, named exactly as the "Album Name" column.
 
-1. Open the **PCA Photo Hub** root folder in Drive
-2. Create a subfolder with the **exact same name** as in the sheet
-   - Example: `Spring Autocross 2026`
-   - Example: `Summer BBQ Photos`
-   - Example: `Wine Country Drive`
-
-**Important**: Folder names must match exactly (case-sensitive)!
+If you'd rather create a folder yourself ahead of time (e.g. to pre-load some photos), name it to **match the sheet exactly (case-sensitive)**:
+- Example: `Spring Autocross 2026`
+- Example: `Summer BBQ Photos`
+- Example: `Wine Country Drive`
 
 ---
 

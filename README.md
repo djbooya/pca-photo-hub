@@ -303,6 +303,12 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.1.0 (Sep 7, 2026)
+- **Added:** Albums configured in Google Sheets that don't yet have a matching Drive folder are now created automatically -- no more manually creating a folder for every new row in the config sheet
+- **Behavior:** A folder is only auto-created if the album's upload end date hasn't already passed (or has no end date set); an album whose window already closed before it ever got a folder is skipped rather than creating a folder nobody can use
+- **Where:** Implemented in `AlbumManager::loadAndMatchAlbums()`, so it runs whenever albums are loaded (homepage and album page); folder names come directly from the "Album Name" column, created under `GOOGLE_DRIVE_ROOT_FOLDER_ID`
+- **Resilient:** If folder creation fails (e.g. a transient API error), it's logged (`APP_DEBUG=true`) and skipped for that request -- retried automatically on the next page load
+
 ### v1.0.9 (Sep 7, 2026)
 - **Fixed:** Uploading a photo crashed with an uncaught `TypeError: base64_encode(): Argument #1 ($string) must be of type string, resource given` -- `GoogleDriveManager::uploadFile()` passed a file resource handle (`fopen()`) as the multipart upload's `data`, but Google's client library base64-encodes that value internally, and PHP 8's `base64_encode()` rejects anything but a string. Now reads the file's contents into a string first (`file_get_contents()`); fine for uploads capped at 25MB.
 - **Hardened:** All `catch` blocks around Google API client calls now catch `\Throwable` instead of `\Exception` -- a `TypeError` (like this one) extends PHP's `Error` class, not `Exception`, so it completely bypassed our error handling and `Logger` calls, crashing uncaught with zero diagnostic trail. They're now caught, logged, and summarized like any other failure.
@@ -389,4 +395,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.9 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.1.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
