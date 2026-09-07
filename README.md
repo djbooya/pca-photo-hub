@@ -307,6 +307,10 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.1.4 (Sep 7, 2026)
+- **Added:** The root `index.php` redirect now sends explicit `Cache-Control: no-store, no-cache, must-revalidate` headers. A 302 is already non-cacheable per spec, but the CDN in front of this site was observed pinning an older `301` from this URL and replaying it to visitors long after the underlying issue was fixed -- which is very painful to diagnose (HEAD requests showed the correct fresh response while GET requests served the stale cached one).
+- **Note:** If you deploy a redirect fix and still see old behavior, suspect CDN caching. Test with a cache-busting query string (`?cb=$(date +%s)`) to force a miss, then purge the CDN cache.
+
 ### v1.1.3 (Sep 7, 2026)
 - **Fixed:** Redirect loop still occurred behind a CDN/reverse proxy that terminates TLS and forwards to the origin over plain HTTP -- the v1.1.2 redirect used a scheme-relative `Location` header, which Apache reconstructed into an absolute URL using its own (wrong) view of the connection scheme, silently downgrading HTTPS visitors to `http://`, which then bounced back to HTTPS via the host's own HTTP→HTTPS redirect. The root `index.php` redirect now builds a fully-qualified absolute URL itself, respecting `X-Forwarded-Proto`, so the scheme is never ambiguous.
 - **Fixed:** `/pca-photo-hub/public/` was returning `403 Forbidden` -- the v1.1.1 root `.htaccess` denied the whole directory by default and relied on `public/.htaccess` overriding that back to allowed, which depends on `Require`/`Order` directives correctly cascading through nested `.htaccess` files and being permitted by `AllowOverride`; this did not behave consistently on this host/CDN. Replaced with an explicit denylist (`config/`, `src/`, `storage/`, `vendor/`, dotfiles, `*.json`/`*.log`/`*.lock`, and the markdown docs) using `mod_rewrite` `[F]`, which is scoped to this directory only and isn't inherited into `public/`, so no override is needed there at all.
@@ -413,4 +417,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.1.3 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.1.4 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

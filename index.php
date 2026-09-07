@@ -43,5 +43,12 @@ $isHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off'
 $scheme = $isHttps ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
 
+// Explicitly non-cacheable. A 302 is already non-cacheable per spec, but
+// CDNs in front of this app have been observed pinning redirects from
+// this URL -- a wrong one then keeps getting replayed to visitors long
+// after the underlying issue is fixed, which is painful to diagnose.
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
+
 header('Location: ' . $scheme . '://' . $host . $path . '/public/', true, 302);
 exit;
