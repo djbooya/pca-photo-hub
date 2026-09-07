@@ -63,9 +63,19 @@ if (file_exists($envPath)) {
     $bootLog[] = ".env file NOT found at: $envPath -- relying entirely on host/webserver environment variables";
 }
 
-// Helper function to get environment variable with default
-if (!function_exists('getEnv')) {
-    function getEnv($key, $default = null) {
+// Helper function to get a required environment variable, throwing if missing.
+//
+// IMPORTANT: this must NOT be named getEnv(). PHP function names are
+// case-insensitive, so a function called getEnv() is the *same function*
+// as PHP's built-in getenv() -- you cannot define/override it. A prior
+// version of this file did exactly that: the function_exists('getEnv')
+// guard silently detected the built-in and skipped defining our version,
+// so every "getEnv(...)" call in this file was secretly calling PHP's
+// real getenv(), which only reads the OS process environment (populated
+// via putenv()) and knows nothing about the $_ENV values our .env loader
+// sets above -- so it always returned false, no matter what .env said.
+if (!function_exists('requireEnv')) {
+    function requireEnv($key, $default = null) {
         $value = $_ENV[$key] ?? getenv($key) ?? $default;
         if ($value === null) {
             throw new \Exception("Missing required environment variable: $key");
@@ -122,7 +132,7 @@ if (empty($sheetsConfigId)) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.0.5',
+        'version' => '1.0.6',
         'release_date' => '2026-09-07',
         'debug' => $debugEnabled,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
@@ -130,12 +140,12 @@ return [
     ],
 
     'google' => [
-        'service_account_json' => getEnv('GOOGLE_SERVICE_ACCOUNT_JSON'),
+        'service_account_json' => requireEnv('GOOGLE_SERVICE_ACCOUNT_JSON'),
         'drive' => [
-            'root_folder_id' => getEnv('GOOGLE_DRIVE_ROOT_FOLDER_ID'),
+            'root_folder_id' => requireEnv('GOOGLE_DRIVE_ROOT_FOLDER_ID'),
         ],
         'sheets' => [
-            'config_id' => getEnv('GOOGLE_SHEETS_CONFIG_ID'),
+            'config_id' => requireEnv('GOOGLE_SHEETS_CONFIG_ID'),
             'config_range' => getEnvOptional('GOOGLE_SHEETS_CONFIG_RANGE', 'Sheet1!A:E'),
         ],
     ],

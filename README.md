@@ -299,6 +299,11 @@ Before digging further, set `APP_DEBUG=true` in `.env` and reload the failing pa
 
 ## Release Notes
 
+### v1.0.6 (Sep 7, 2026)
+- **Fixed (root cause):** The persistent `GOOGLE_SERVICE_ACCOUNT_JSON is not set in .env` error, found using the v1.0.5 debug logs, was caused by naming a helper function `getEnv()`. PHP function names are case-insensitive, so `getEnv()` is literally the same function as PHP's built-in `getenv()` and cannot be overridden -- the `function_exists('getEnv')` guard added in v1.0.1 was silently detecting the built-in and skipping our version, so every `getEnv(...)` call was secretly invoking PHP's real `getenv()`, which only reads the OS process environment and knows nothing about `.env` values. It always returned `false`.
+- **Fixed:** Renamed the helper to `requireEnv()` throughout `config.php` so it no longer collides with any PHP built-in
+- **Credit:** Found by reading the v1.0.5 debug panel, which showed `GOOGLE_SERVICE_ACCOUNT_JSON` resolving correctly via `getEnvOptional()` (no collision) but the final config value still showing empty -- pointing straight at the one place still using the broken `getEnv()`
+
 ### v1.0.5 (Sep 7, 2026)
 - **Added:** Diagnostic debug logging, gated entirely behind `APP_DEBUG=true` in `.env`
 - **Added:** `src/Logger.php` -- writes detailed step-by-step logs to `storage/logs/debug.log` (`.env` loading, Google auth validation, every Drive/Sheets API call) and renders a readable on-screen debug panel on the homepage and album page
@@ -364,4 +369,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.5 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.6 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
