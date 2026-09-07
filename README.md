@@ -295,6 +295,15 @@ Album configuration is stored in a Google Sheet with these columns:
 
 ## Release Notes
 
+### v1.0.2 (Sep 7, 2026)
+- **Fixed:** Service account JSON is now validated (exists, readable, valid JSON, has required fields) before being handed to the Google client
+- **Fixed:** Previously a bad/missing credentials path failed silently inside the Google API client, producing "Trying to access array offset on false" warnings and a broken auth request that Google redirected to an HTML error page instead of a clean API error
+- **Improved:** Auth failures on `GoogleDriveManager` and `GoogleSheetsManager` now throw a clear, actionable exception naming the exact problem (missing file, unreadable, invalid JSON, or missing fields)
+
+### v1.0.1 (Sep 6, 2026)
+- **Fixed:** "Cannot redeclare getEnv()" fatal error on shared hosting when `config.php` is included more than once per request
+- **Fixed:** Wrapped `getEnv()` and `getEnvOptional()` in `function_exists()` guards for hosting compatibility
+
 ### v1.0.0 (Aug 30, 2026)
 - **Added:** Complete photo-sharing platform with drag-and-drop upload
 - **Added:** Password-protected album support
@@ -332,4 +341,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.0 | **Last Updated:** Aug 30, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.2 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

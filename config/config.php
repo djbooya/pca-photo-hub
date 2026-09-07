@@ -36,8 +36,8 @@ if (!function_exists('getEnvOptional')) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.0.0',
-        'release_date' => '2026-08-30',
+        'version' => '1.0.2',
+        'release_date' => '2026-09-07',
         'debug' => getEnvOptional('APP_DEBUG', false) === 'true' || getEnvOptional('APP_DEBUG', false) === true,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
         'timezone' => getEnvOptional('TIMEZONE', 'America/Los_Angeles'),
