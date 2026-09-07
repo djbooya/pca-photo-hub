@@ -26,11 +26,46 @@ class GoogleDriveManager
      */
     private function initializeClient()
     {
+        $jsonPath = $this->config['google']['service_account_json'];
+        $this->validateServiceAccountJson($jsonPath);
+
         $this->client = new Client();
-        $this->client->setAuthConfig($this->config['google']['service_account_json']);
+        $this->client->setAuthConfig($jsonPath);
         $this->client->addScope(Drive::DRIVE);
 
         $this->service = new Drive($this->client);
+    }
+
+    /**
+     * Validate the service account JSON file exists, is readable, and is valid
+     * before handing it to the Google client. Without this check, a bad path
+     * fails silently deep inside the client library and manifests as a
+     * confusing "array offset on false" warning followed by broken auth.
+     */
+    private function validateServiceAccountJson($jsonPath)
+    {
+        if (empty($jsonPath)) {
+            throw new \Exception("GOOGLE_SERVICE_ACCOUNT_JSON is not set in .env");
+        }
+
+        if (!file_exists($jsonPath)) {
+            throw new \Exception("Service account JSON file not found at: {$jsonPath}");
+        }
+
+        if (!is_readable($jsonPath)) {
+            throw new \Exception("Service account JSON file is not readable (check permissions): {$jsonPath}");
+        }
+
+        $contents = file_get_contents($jsonPath);
+        $decoded = json_decode($contents, true);
+
+        if ($decoded === null) {
+            throw new \Exception("Service account JSON file is not valid JSON: {$jsonPath}");
+        }
+
+        if (empty($decoded['client_email']) || empty($decoded['private_key'])) {
+            throw new \Exception("Service account JSON file is missing required fields (client_email/private_key): {$jsonPath}");
+        }
     }
 
     /**
