@@ -311,4 +311,29 @@ class GoogleDriveManager
             throw new \Exception('Failed to create folder: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
+
+    /**
+     * Download the raw bytes of a file. Used by the signed media proxy so
+     * Meta can fetch a photo during publishing without the Drive file ever
+     * being made public.
+     */
+    public function downloadFile($fileId)
+    {
+        Logger::debug('GoogleDriveManager: downloading file', ['file_id' => $fileId]);
+
+        try {
+            $response = $this->service->files->get($fileId, [
+                'alt' => 'media',
+                'supportsAllDrives' => true,
+            ]);
+
+            return $response->getBody()->getContents();
+        } catch (\Throwable $e) {
+            Logger::error('GoogleDriveManager: downloadFile failed', [
+                'file_id' => $fileId,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to download file: ' . ErrorSummarizer::summarize($e->getMessage()));
+        }
+    }
 }

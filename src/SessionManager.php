@@ -123,6 +123,12 @@ class SessionManager
      */
     public function canDeleteFile($fileId)
     {
+        // Admins delete for screening purposes, so they are not restricted
+        // to their own uploads or to the deletion window.
+        if (!empty($_SESSION[AdminAuth::SESSION_KEY])) {
+            return true;
+        }
+
         $userFiles = $this->getUserUploadedFiles();
 
         if (!isset($userFiles[$fileId])) {

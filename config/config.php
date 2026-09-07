@@ -157,7 +157,7 @@ if (empty($sheetsConfigId)) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.2.0',
+        'version' => '1.3.0',
         'release_date' => '2026-09-07',
         'debug' => $debugEnabled,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
@@ -175,7 +175,7 @@ return [
         ],
         'sheets' => [
             'config_id' => requireEnv('GOOGLE_SHEETS_CONFIG_ID'),
-            'config_range' => getEnvOptional('GOOGLE_SHEETS_CONFIG_RANGE', 'Sheet1!A:E'),
+            'config_range' => getEnvOptional('GOOGLE_SHEETS_CONFIG_RANGE', 'Sheet1!A:F'),
         ],
     ],
 
@@ -184,6 +184,35 @@ return [
         'max_file_size_bytes' => (int) getEnvOptional('MAX_FILE_SIZE_MB', 25) * 1024 * 1024,
         'allowed_mime_types' => explode(',', getEnvOptional('ALLOWED_MIME_TYPES', 'image/jpeg,image/png,image/webp')),
         'timeout_days' => (int) getEnvOptional('UPLOAD_TIMEOUT_DAYS', 7),
+    ],
+
+    'admin' => [
+        // The admin password itself comes from column F of the config
+        // sheet (see GoogleSheetsManager::getAdminPassword), not .env.
+        'session_timeout_minutes' => (int) getEnvOptional('ADMIN_SESSION_TIMEOUT_MINUTES', 60),
+    ],
+
+    // Meta fetches photos by URL when publishing, so selected photos are
+    // exposed through short-lived signed links rather than ever being made
+    // public in Drive. See src/MediaLink.php and public/media.php.
+    'media_link' => [
+        'secret' => getEnvOptional('MEDIA_LINK_SECRET', ''),
+        'ttl_minutes' => (int) getEnvOptional('MEDIA_LINK_TTL_MINUTES', 15),
+        'public_base_url' => getEnvOptional('PUBLIC_BASE_URL', ''),
+    ],
+
+    'meta' => [
+        'graph_version' => getEnvOptional('META_GRAPH_VERSION', 'v21.0'),
+        'facebook' => [
+            'page_id' => getEnvOptional('FACEBOOK_PAGE_ID', ''),
+            'access_token' => getEnvOptional('FACEBOOK_PAGE_ACCESS_TOKEN', ''),
+        ],
+        'instagram' => [
+            'business_account_id' => getEnvOptional('INSTAGRAM_BUSINESS_ACCOUNT_ID', ''),
+            'access_token' => getEnvOptional('INSTAGRAM_ACCESS_TOKEN', ''),
+            // Meta caps a carousel at 10 items.
+            'max_carousel_items' => 10,
+        ],
     ],
 
     'session' => [

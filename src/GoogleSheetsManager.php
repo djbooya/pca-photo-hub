@@ -8,6 +8,9 @@ use Google\Service\Sheets;
 /**
  * GoogleSheetsManager - Handles reading album configuration from Google Sheets
  * Caches results for 5 minutes to reduce API calls
+ *
+ * Sheet columns: A Album Name | B Password | C Upload Start | D Upload End
+ *                E Notes      | F Admin Password
  */
 class GoogleSheetsManager
 {
@@ -16,6 +19,7 @@ class GoogleSheetsManager
     private $config;
     private $cacheDir;
     private $cacheTTL = 300; // 5 minutes
+    private $loaded = null;  // in-request memo of the parsed sheet
 
     public function __construct($config)
     {
@@ -89,32 +93,78 @@ class GoogleSheetsManager
     }
 
     /**
-     * Get album configuration from Google Sheets
-     * Format: Album Name | Password | Upload Start Date | Upload End Date | Notes
+     * Album rows from the config sheet.
      */
     public function getAlbumConfig()
     {
+        $data = $this->loadConfig();
+        return $data['albums'];
+    }
+
+    /**
+     * The admin password from column F, or an empty string when the column
+     * is absent or blank. This is a single global password: the first
+     * non-empty value found in the sheet wins.
+     */
+    public function getAdminPassword()
+    {
+        $data = $this->loadConfig();
+        return $data['admin_password'];
+    }
+
+    /**
+     * Load the parsed sheet: in-request memo, then the on-disk cache, then
+     * the Sheets API.
+     */
+    private function loadConfig()
+    {
+        if ($this->loaded !== null) {
+            return $this->loaded;
+        }
+
         $cacheFile = $this->cacheDir . '/albums.json';
 
-        // Check cache
         if (file_exists($cacheFile)) {
             $fileAge = time() - filemtime($cacheFile);
             if ($fileAge < $this->cacheTTL) {
-                Logger::debug('GoogleSheetsManager: returning cached album config', ['age_seconds' => $fileAge]);
-                return json_decode(file_get_contents($cacheFile), true);
+                $normalized = $this->normalizeCached(json_decode(file_get_contents($cacheFile), true));
+                if ($normalized !== null) {
+                    Logger::debug('GoogleSheetsManager: returning cached album config', ['age_seconds' => $fileAge]);
+                    return $this->loaded = $normalized;
+                }
             }
         }
 
-        // Fetch from Google Sheets
-        $albums = $this->fetchFromSheets();
+        $data = $this->fetchFromSheets();
 
-        // Save to cache
         if (!is_dir($this->cacheDir)) {
             mkdir($this->cacheDir, 0755, true);
         }
-        file_put_contents($cacheFile, json_encode($albums, JSON_PRETTY_PRINT));
+        file_put_contents($cacheFile, json_encode($data, JSON_PRETTY_PRINT));
 
-        return $albums;
+        return $this->loaded = $data;
+    }
+
+    /**
+     * Accepts both the current cache shape and the pre-v1.3.0 one (a bare
+     * list of album rows), so an existing cache file does not have to be
+     * deleted by hand on upgrade.
+     */
+    private function normalizeCached($cached)
+    {
+        if (!is_array($cached)) {
+            return null;
+        }
+
+        if (isset($cached['albums']) && is_array($cached['albums'])) {
+            return [
+                'albums' => $cached['albums'],
+                'admin_password' => (string) ($cached['admin_password'] ?? ''),
+            ];
+        }
+
+        // Old format: a plain list of albums, with no admin password yet.
+        return ['albums' => $cached, 'admin_password' => ''];
     }
 
     /**
@@ -137,13 +187,27 @@ class GoogleSheetsManager
             Logger::debug('GoogleSheetsManager: fetch succeeded', ['row_count' => count($values ?? [])]);
 
             if (empty($values)) {
-                return [];
+                return ['albums' => [], 'admin_password' => ''];
             }
 
             $albums = [];
+            $adminPassword = '';
             $headers = array_shift($values); // Get headers from first row
 
             foreach ($values as $row) {
+                // Column F is the admin password: one global value repeated
+                // down the rows, so the first non-empty one wins. Differing
+                // values are flagged, since that is a typo waiting to lock
+                // somebody out.
+                $rowAdmin = isset($row[5]) ? trim((string) $row[5]) : '';
+                if ($rowAdmin !== '') {
+                    if ($adminPassword === '') {
+                        $adminPassword = $rowAdmin;
+                    } elseif ($adminPassword !== $rowAdmin) {
+                        Logger::warning('GoogleSheetsManager: column F (Admin Password) differs between rows -- using the first non-empty value');
+                    }
+                }
+
                 if (empty($row) || empty($row[0])) {
                     continue; // Skip empty rows
                 }
@@ -170,7 +234,12 @@ class GoogleSheetsManager
                 }
             }
 
-            return $albums;
+            Logger::debug('GoogleSheetsManager: parsed sheet', [
+                'albums' => count($albums),
+                'admin_password_set' => $adminPassword !== '',
+            ]);
+
+            return ['albums' => $albums, 'admin_password' => $adminPassword];
         } catch (\Throwable $e) {
             Logger::error('GoogleSheetsManager: fetch failed', [
                 'spreadsheet_id' => $spreadsheetId,
@@ -186,6 +255,7 @@ class GoogleSheetsManager
      */
     public function clearCache()
     {
+        $this->loaded = null;
         $cacheFile = $this->cacheDir . '/albums.json';
         if (file_exists($cacheFile)) {
             unlink($cacheFile);

@@ -87,13 +87,16 @@ This will install:
 1. Create a new Google Sheet named "PCA Photo Hub Config"
 2. Add these column headers in the first row:
    ```
-   Album Name | Password | Upload Start | Upload End | Notes
+   Album Name | Password | Upload Start | Upload End | Notes | Admin Password
    ```
 3. Add your albums as rows:
    ```
-   Spring Autocross 2026 | porsche123 | 2026-03-01 | 2026-04-15 | Mog Park location
-   Summer BBQ Photos | bbqpics2026 | 2026-06-01 | 2026-08-31 | Main event
+   Spring Autocross 2026 | porsche123 | 2026-03-01 | 2026-04-15 | Mog Park location | clubadmin2026
+   Summer BBQ Photos | bbqpics2026 | 2026-06-01 | 2026-08-31 | Main event          |
    ```
+   Column F is a single global admin password for `/admin.php` — the first non-empty value
+   found wins, so it only needs filling in once. Make sure `GOOGLE_SHEETS_CONFIG_RANGE`
+   in `.env` covers column F (e.g. `Config!A:F`).
 4. Share the sheet with the service account (Editor access)
 5. Copy the Sheet ID from the URL: `https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit`
 
@@ -194,17 +197,26 @@ pca-photo-hub/
 │   ├── FileUploadHandler.php    # Upload validation
 │   ├── SessionManager.php       # User session tracking
 │   ├── Logger.php               # Debug logging (APP_DEBUG-gated)
+│   ├── AdminAuth.php            # Admin password gate + CSRF
+│   ├── MediaLink.php            # Signed short-lived photo URLs for Meta
+│   ├── MetaGraph.php            # Meta Graph API client
+│   ├── FacebookPublisher.php    # Creates Page albums, uploads photos
+│   ├── InstagramPublisher.php   # Feed post / carousel publishing
 │   └── ErrorSummarizer.php      # Readable Google API error messages
 ├── public/
 │   ├── index.php               # Homepage
 │   ├── album.php               # Album detail page
 │   ├── upload.php              # Upload handler
 │   ├── delete.php              # Delete handler
+│   ├── admin.php               # Admin screening + publishing UI
+│   ├── admin_action.php        # Admin delete/publish endpoint
+│   ├── media.php               # Signed image proxy (Meta fetches these)
 │   ├── init.php                # Bootstrap file
 │   ├── css/
 │   │   └── style.css           # Responsive styles
 │   ├── js/
 │   │   ├── upload.js           # Upload logic
+│   │   ├── admin.js            # Admin selection + publish dialogs
 │   │   └── gallery.js          # Gallery display
 │   └── assets/
 │       └── diablo-pca-logo.png
@@ -224,11 +236,34 @@ pca-photo-hub/
 - `GET /` - Homepage with album list
 - `GET /album.php?id={folder_id}` - Album detail + upload page
 
+### Admin
+
+- `GET /admin.php` - Sign in, pick an album, screen and publish photos
+- `POST /admin_action.php` - Delete selected / publish to Facebook / publish to Instagram
+- `GET /media.php?f=&exp=&sig=` - Signed, short-lived image proxy used only so Meta can
+  fetch photos during publishing (403s without a valid, unexpired signature)
+
 ### AJAX Endpoints
 
 - `POST /upload.php` - Handle file uploads
 - `POST /delete.php` - Delete user's uploaded file
 - `GET /album.php?id={folder_id}&json=1` - Get album data (JSON)
+
+## Admin Area
+
+Visit `/admin.php` and sign in with the password from column F of the config sheet.
+
+- **Screening** — select any photos in an album and delete them. Admins are not restricted
+  to their own uploads or the 7-day member deletion window.
+- **Publish to Facebook** — creates an album on the club Facebook **Page** with your chosen
+  cover, name and description. Facebook *Groups* cannot be posted to by any app; Meta
+  removed that API in April 2024.
+- **Publish to Instagram** — posts to the feed as a single image or a carousel (max 10),
+  with caption text and optional hashtags. Instagram *Stories* cannot carry text or tags
+  through the API.
+
+Deleting works with no extra setup. Publishing needs `MEDIA_LINK_SECRET` plus the Meta
+credentials — see **[META_SETUP.md](META_SETUP.md)**.
 
 ## Configuration
 
@@ -306,6 +341,17 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 - Clear browser cookies and try again
 
 ## Release Notes
+
+### v1.3.0 (Sep 7, 2026)
+- **Added:** Password-protected **admin area** at `/admin.php`. The password lives in a new **column F ("Admin Password")** of the config spreadsheet, so officers can rotate it without server access. Widen `GOOGLE_SHEETS_CONFIG_RANGE` to cover column F (e.g. `Config!A:F`); with no password set the admin area stays shut rather than open.
+- **Added:** Admins can select any photos in an album and **delete** them for screening — not limited to their own uploads or the 7-day window that applies to members.
+- **Added:** **Publish to a Facebook Page album** — prompts for album name (defaulting to the hub album name), optional description, and which selected photo is the cover.
+- **Added:** **Publish to Instagram** as a feed post — one photo, or a swipeable carousel for several (max 10) — with caption text and optional hashtags.
+- **Added:** `public/media.php`, a short-lived HMAC-signed image proxy. Meta fetches photos by URL rather than accepting uploaded bytes, so each selected photo gets a link that expires in minutes; **nothing in Google Drive is ever made public**. Requires `MEDIA_LINK_SECRET`.
+- **Added:** `META_SETUP.md` covering the Meta app, Page token, and Instagram account setup — including how to avoid App Review entirely by using Development mode.
+- **Security:** Admin actions require a CSRF token and an authenticated session; logins are rate-limited (5 attempts, then a 15-minute lockout) and compared with `hash_equals()`. The media proxy refuses anything unsigned, expired, outside a configured album folder, or not an image.
+- **Note on Facebook Groups:** posting to a Group is **not possible** — Meta removed the Groups API entirely on 2024-04-22, taking `publish_to_groups` and every Groups publishing endpoint with it. Pages are the only supported target.
+- **Note on Instagram Stories:** the API cannot attach text, tags or stickers to a Story, so publishing targets the feed, where the caption carries both.
 
 ### v1.2.0 (Sep 7, 2026)
 - **Added:** The entire album tile is now a single tap target on albums that are open for uploads, rather than just the small button -- the tap area went from roughly 343×48px to 343×339px on a phone. Closed and upcoming albums stay non-clickable.
@@ -426,4 +472,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.2.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.3.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
