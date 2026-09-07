@@ -171,7 +171,7 @@ class GoogleSheetsManager
             }
 
             return $albums;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::error('GoogleSheetsManager: fetch failed', [
                 'spreadsheet_id' => $spreadsheetId,
                 'range' => $range,

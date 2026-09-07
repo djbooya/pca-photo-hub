@@ -303,6 +303,10 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.0.9 (Sep 7, 2026)
+- **Fixed:** Uploading a photo crashed with an uncaught `TypeError: base64_encode(): Argument #1 ($string) must be of type string, resource given` -- `GoogleDriveManager::uploadFile()` passed a file resource handle (`fopen()`) as the multipart upload's `data`, but Google's client library base64-encodes that value internally, and PHP 8's `base64_encode()` rejects anything but a string. Now reads the file's contents into a string first (`file_get_contents()`); fine for uploads capped at 25MB.
+- **Hardened:** All `catch` blocks around Google API client calls now catch `\Throwable` instead of `\Exception` -- a `TypeError` (like this one) extends PHP's `Error` class, not `Exception`, so it completely bypassed our error handling and `Logger` calls, crashing uncaught with zero diagnostic trail. They're now caught, logged, and summarized like any other failure.
+
 ### v1.0.8 (Sep 7, 2026)
 - **Fixed:** Homepage silently stopped rendering right after "Select an event below to upload your photos" whenever an album's dates were served from `storage/cache/albums.json` instead of a fresh Sheets fetch -- a fatal error with `display_errors` off, so the page just truncated with no visible error
 - **Root cause:** `GoogleSheetsManager` parsed the Sheet's date columns into `DateTime` objects and then `json_encode()`'d them straight into the cache file. A `DateTime` object round-tripped through JSON does not come back as a `DateTime` -- it comes back as a plain array of its internal representation. On the next request served from cache, `AlbumManager` called `->format()`/`->diff()` on that array and fatal-errored mid-render.
@@ -385,4 +389,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.8 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.9 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

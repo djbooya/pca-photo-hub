@@ -119,7 +119,7 @@ class GoogleDriveManager
             }
 
             return $files;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::error('GoogleDriveManager: listRootFolders failed', [
                 'root_folder_id' => $rootFolderId,
                 'raw_error' => substr($e->getMessage(), 0, 2000),
@@ -152,7 +152,7 @@ class GoogleDriveManager
             Logger::debug('GoogleDriveManager: listFilesInFolder succeeded', ['file_count' => count($files)]);
 
             return $files;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::error('GoogleDriveManager: listFilesInFolder failed', [
                 'folder_id' => $folderId,
                 'raw_error' => substr($e->getMessage(), 0, 2000),
@@ -186,8 +186,14 @@ class GoogleDriveManager
             $file->setName($fileName);
             $file->setParents([$folderId]);
 
+            // A multipart upload needs the file contents as a string, not a
+            // resource handle -- Google's client base64-encodes this value
+            // internally, and PHP 8's base64_encode() throws a TypeError on
+            // anything but a string. Files are capped at
+            // upload.max_file_size_mb (25MB default) so reading the whole
+            // thing into memory here is fine.
             $result = $this->service->files->create($file, [
-                'data' => fopen($filePath, 'r'),
+                'data' => file_get_contents($filePath),
                 'mimeType' => $mimeType,
                 'uploadType' => 'multipart',
                 'supportsAllDrives' => true,
@@ -202,7 +208,7 @@ class GoogleDriveManager
                 'createdTime' => $result->getCreatedTime(),
                 'webContentLink' => $result->getWebContentLink(),
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::error('GoogleDriveManager: upload failed', [
                 'folder_id' => $folderId,
                 'file_name' => $fileName,
@@ -221,7 +227,7 @@ class GoogleDriveManager
             $this->service->files->delete($fileId, ['supportsAllDrives' => true]);
             Logger::info('GoogleDriveManager: file deleted', ['file_id' => $fileId]);
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::error('GoogleDriveManager: delete failed', [
                 'file_id' => $fileId,
                 'raw_error' => substr($e->getMessage(), 0, 2000),
@@ -252,8 +258,12 @@ class GoogleDriveManager
                 'thumbnailLink' => $file->getThumbnailLink(),
                 'parents' => $file->getParents() ?: [],
             ];
-        } catch (\Exception $e) {
-            throw new \Exception("Failed to get file metadata: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            Logger::error('GoogleDriveManager: getFileMetadata failed', [
+                'file_id' => $fileId,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to get file metadata: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 
@@ -265,7 +275,7 @@ class GoogleDriveManager
         try {
             $metadata = $this->getFileMetadata($fileId);
             return in_array($folderId, $metadata['parents']);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -293,8 +303,12 @@ class GoogleDriveManager
                 'id' => $result->getId(),
                 'name' => $result->getName(),
             ];
-        } catch (\Exception $e) {
-            throw new \Exception("Failed to create folder: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            Logger::error('GoogleDriveManager: createFolder failed', [
+                'folder_name' => $folderName,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to create folder: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 }
