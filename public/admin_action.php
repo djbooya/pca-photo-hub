@@ -40,7 +40,7 @@ try {
 
     $driveManager = new GoogleDriveManager($config);
     $sheetsManager = new GoogleSheetsManager($config);
-    $auth = new AdminAuth($config, $sheetsManager->getAdminPassword());
+    $auth = new AdminAuth($config);
 
     if (!$auth->isLoggedIn()) {
         adminJsonFail('Your admin session has expired. Please sign in again.', 401);
@@ -70,6 +70,15 @@ try {
     $album = $albumManager->getAlbumByFolderId($folderId);
     if (!$album) {
         adminJsonFail('Album not found.');
+    }
+
+    // Admin rights are per album. Re-checked here rather than trusted from
+    // the page, so a crafted request cannot reach an album this password
+    // does not cover. Same message either way, so this cannot be used to
+    // probe which albums exist.
+    if (!$auth->canAdminAlbum($album)) {
+        Logger::warning('admin_action: album access denied', ['folder_id' => $folderId, 'action' => $_POST['action'] ?? '']);
+        adminJsonFail('You do not have admin access to that album.', 403);
     }
 
     // Confine every action to files that genuinely live in this album, so a

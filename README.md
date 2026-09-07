@@ -91,12 +91,24 @@ This will install:
    ```
 3. Add your albums as rows:
    ```
-   Spring Autocross 2026 | porsche123 | 2026-03-01 | 2026-04-15 | Mog Park location | clubadmin2026
-   Summer BBQ Photos | bbqpics2026 | 2026-06-01 | 2026-08-31 | Main event          |
+   Spring Autocross 2026 | porsche123 | 2026-03-01 | 2026-04-15 | Mog Park   | springlead26
+   Summer BBQ Photos     | bbqpics    | 2026-06-01 | 2026-08-31 | Main event | springlead26
+   Wine Country Drive    | winenight  | 2026-09-15 | 2026-10-15 | NorCal     | winelead26
+   Members Only Gallery  | members    |            |            |            |
    ```
-   Column F is a single global admin password for `/admin.php` — the first non-empty value
-   found wins, so it only needs filling in once. Make sure `GOOGLE_SHEETS_CONFIG_RANGE`
-   in `.env` covers column F (e.g. `Config!A:F`).
+
+   **Column F grants admin access to that album only.** Signing in at `/admin.php` with a
+   password opens exactly the albums whose row carries it — not the whole site.
+
+   - **Reusing a password is intentional.** In the example above, `springlead26` appears on
+     two rows, so that one password administers both of those albums and nothing else.
+     `winelead26` administers only the Wine Country Drive album.
+   - **A blank column F means the album has no admin access at all** — no password reaches
+     it, as with "Members Only Gallery" above.
+   - Changing or clearing a password revokes access on the next request (once the 5-minute
+     sheet cache refreshes); the person does not stay signed in.
+
+   Make sure `GOOGLE_SHEETS_CONFIG_RANGE` in `.env` covers column F (e.g. `Config!A:F`).
 4. Share the sheet with the service account (Editor access)
 5. Copy the Sheet ID from the URL: `https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit`
 
@@ -251,7 +263,16 @@ pca-photo-hub/
 
 ## Admin Area
 
-Visit `/admin.php` and sign in with the password from column F of the config sheet.
+Visit `/admin.php` and sign in with an admin password from column F of the config sheet.
+
+**Access is per album.** A password opens exactly the albums whose row carries that value,
+and the album list shows only those — an event lead scoped to their own events never sees
+or touches anyone else's. Putting the same password on several rows is the supported way to
+give one person a set of albums. An album with a blank column F has no admin access at all.
+
+Authorization is re-checked on every request against the current sheet, so changing a
+password takes effect without waiting for the session to expire. The server never stores the
+password itself, only a hash of it.
 
 - **Screening** — select any photos in an album and delete them. Admins are not restricted
   to their own uploads or the 7-day member deletion window.
@@ -341,6 +362,15 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 - Clear browser cookies and try again
 
 ## Release Notes
+
+### v1.4.0 (Sep 7, 2026)
+- **Changed (security):** Admin access is now **per album** rather than site-wide. Column F of the config sheet is read per row, and signing in with a password opens exactly the albums whose row carries that value. The album list shows only those, so an event lead scoped to their own events cannot see or touch anyone else's.
+- **Password reuse is a supported pattern:** putting the same value on several rows gives one password admin rights over precisely that set of albums. A **blank** column F means the album has no admin access at all — no password reaches it.
+- **Changed:** Authorization is re-derived from the sheet on every request instead of being fixed at sign-in, so changing or clearing a password revokes access as soon as the 5-minute sheet cache refreshes rather than lingering until the session expires.
+- **Changed:** The session stores only a SHA-256 hash of the submitted password, never the password itself.
+- **Removed:** The session-wide admin bypass in `SessionManager::canDeleteFile()`. That path (`public/delete.php`) receives only a file id and cannot tell which album a file belongs to, so under per-album scoping a global flag would have let an admin of one album delete from any other. Admin deletion runs through `admin_action.php`, which verifies album membership *and* per-album authorization.
+- **Hardened:** `admin_action.php` re-checks per-album rights server-side on every action rather than trusting the page, and returns identical wording whether an album is missing or merely unauthorized, so it cannot be used to enumerate albums.
+- **Upgrade note:** No sheet restructuring needed — column F simply means "admin password for this row" now. Give each album the password its lead should use; leave it blank for albums nobody should administer. Existing cached config is migrated automatically.
 
 ### v1.3.0 (Sep 7, 2026)
 - **Added:** Password-protected **admin area** at `/admin.php`. The password lives in a new **column F ("Admin Password")** of the config spreadsheet, so officers can rotate it without server access. Widen `GOOGLE_SHEETS_CONFIG_RANGE` to cover column F (e.g. `Config!A:F`); with no password set the admin area stays shut rather than open.
@@ -472,4 +502,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.3.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.4.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

@@ -93,23 +93,12 @@ class GoogleSheetsManager
     }
 
     /**
-     * Album rows from the config sheet.
+     * Album rows from the config sheet. Each row carries its own
+     * admin_password (column F).
      */
     public function getAlbumConfig()
     {
-        $data = $this->loadConfig();
-        return $data['albums'];
-    }
-
-    /**
-     * The admin password from column F, or an empty string when the column
-     * is absent or blank. This is a single global password: the first
-     * non-empty value found in the sheet wins.
-     */
-    public function getAdminPassword()
-    {
-        $data = $this->loadConfig();
-        return $data['admin_password'];
+        return $this->loadConfig();
     }
 
     /**
@@ -135,20 +124,21 @@ class GoogleSheetsManager
             }
         }
 
-        $data = $this->fetchFromSheets();
+        $albums = $this->fetchFromSheets();
 
         if (!is_dir($this->cacheDir)) {
             mkdir($this->cacheDir, 0755, true);
         }
-        file_put_contents($cacheFile, json_encode($data, JSON_PRETTY_PRINT));
+        file_put_contents($cacheFile, json_encode($albums, JSON_PRETTY_PRINT));
 
-        return $this->loaded = $data;
+        return $this->loaded = $albums;
     }
 
     /**
-     * Accepts both the current cache shape and the pre-v1.3.0 one (a bare
-     * list of album rows), so an existing cache file does not have to be
-     * deleted by hand on upgrade.
+     * Accepts every cache shape this app has written: the current bare list
+     * of album rows, and the short-lived v1.3.0 wrapper that hoisted a
+     * single global admin password alongside them. An existing cache file
+     * therefore does not have to be deleted by hand on upgrade.
      */
     private function normalizeCached($cached)
     {
@@ -156,15 +146,13 @@ class GoogleSheetsManager
             return null;
         }
 
+        // v1.3.0 wrapper: {albums: [...], admin_password: "..."}. The global
+        // password is dropped -- authorization is per album now.
         if (isset($cached['albums']) && is_array($cached['albums'])) {
-            return [
-                'albums' => $cached['albums'],
-                'admin_password' => (string) ($cached['admin_password'] ?? ''),
-            ];
+            return $cached['albums'];
         }
 
-        // Old format: a plain list of albums, with no admin password yet.
-        return ['albums' => $cached, 'admin_password' => ''];
+        return $cached;
     }
 
     /**
@@ -187,27 +175,13 @@ class GoogleSheetsManager
             Logger::debug('GoogleSheetsManager: fetch succeeded', ['row_count' => count($values ?? [])]);
 
             if (empty($values)) {
-                return ['albums' => [], 'admin_password' => ''];
+                return [];
             }
 
             $albums = [];
-            $adminPassword = '';
             $headers = array_shift($values); // Get headers from first row
 
             foreach ($values as $row) {
-                // Column F is the admin password: one global value repeated
-                // down the rows, so the first non-empty one wins. Differing
-                // values are flagged, since that is a typo waiting to lock
-                // somebody out.
-                $rowAdmin = isset($row[5]) ? trim((string) $row[5]) : '';
-                if ($rowAdmin !== '') {
-                    if ($adminPassword === '') {
-                        $adminPassword = $rowAdmin;
-                    } elseif ($adminPassword !== $rowAdmin) {
-                        Logger::warning('GoogleSheetsManager: column F (Admin Password) differs between rows -- using the first non-empty value');
-                    }
-                }
-
                 if (empty($row) || empty($row[0])) {
                     continue; // Skip empty rows
                 }
@@ -226,6 +200,11 @@ class GoogleSheetsManager
                     'upload_start' => (isset($row[2]) && trim($row[2]) !== '') ? trim($row[2]) : null,
                     'upload_end' => (isset($row[3]) && trim($row[3]) !== '') ? trim($row[3]) : null,
                     'notes' => $row[4] ?? '',
+                    // Column F: the admin password for THIS album only.
+                    // Blank means the album has no admin access at all.
+                    // The same value may be repeated across rows on purpose,
+                    // which grants one password access to that set of albums.
+                    'admin_password' => isset($row[5]) ? trim((string) $row[5]) : '',
                     'folder_id' => null, // Will be populated by AlbumManager
                 ];
 
@@ -236,10 +215,12 @@ class GoogleSheetsManager
 
             Logger::debug('GoogleSheetsManager: parsed sheet', [
                 'albums' => count($albums),
-                'admin_password_set' => $adminPassword !== '',
+                'albums_with_admin_password' => count(array_filter($albums, function ($a) {
+                    return $a['admin_password'] !== '';
+                })),
             ]);
 
-            return ['albums' => $albums, 'admin_password' => $adminPassword];
+            return $albums;
         } catch (\Throwable $e) {
             Logger::error('GoogleSheetsManager: fetch failed', [
                 'spreadsheet_id' => $spreadsheetId,

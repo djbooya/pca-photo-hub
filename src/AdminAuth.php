@@ -3,16 +3,26 @@
 namespace PCAPhotoHub;
 
 /**
- * AdminAuth - Password gate for the admin area.
+ * AdminAuth - Per-album password gate for the admin area.
  *
- * The password comes from column F ("Admin Password") of the config
- * spreadsheet, so club officers can rotate it without touching the server.
- * Admin state lives in the PHP session only -- never in a cookie value --
- * so it cannot be forged client-side.
+ * Each album row carries its own admin password in column F of the config
+ * sheet, and signing in with a password grants admin rights to exactly the
+ * albums whose password matches it -- not to the whole site.
+ *
+ * Password reuse is a supported, deliberate pattern: putting the same
+ * value on several rows gives one password admin access to that set of
+ * albums, so an event lead can be given one password covering their
+ * events while a different lead is scoped to theirs.
+ *
+ * Rather than recording which albums were unlocked at sign-in, the session
+ * stores only a hash of the submitted password and re-derives the album
+ * set on every request. That means changing or clearing a password in the
+ * sheet revokes access as soon as the sheet cache refreshes, instead of
+ * lingering until the session expires.
  */
 class AdminAuth
 {
-    const SESSION_KEY = 'pca_admin_authenticated';
+    const HASH_KEY = 'pca_admin_pw_hash';
     const LAST_ACTIVITY_KEY = 'pca_admin_last_activity';
     const FAILED_KEY = 'pca_admin_failed_attempts';
     const LOCKOUT_KEY = 'pca_admin_lockout_until';
@@ -22,71 +32,69 @@ class AdminAuth
     const LOCKOUT_SECONDS = 900; // 15 minutes
 
     private $config;
-    private $adminPassword;
 
-    /**
-     * @param array       $config
-     * @param string|null $adminPassword Value from the config sheet, or null
-     *                                   if the sheet has no Admin Password column.
-     */
-    public function __construct($config, $adminPassword)
+    public function __construct($config)
     {
         $this->config = $config;
-        $this->adminPassword = is_string($adminPassword) ? trim($adminPassword) : '';
     }
 
     /**
-     * Whether an admin password has actually been configured. With no
-     * password set the admin area refuses to open at all, rather than
-     * letting anyone in.
+     * True when at least one album has an admin password set. With none set
+     * anywhere, the admin area stays shut rather than open.
      */
-    public function isConfigured()
+    public function isConfiguredForAny(array $albums)
     {
-        return $this->adminPassword !== '';
+        foreach ($albums as $album) {
+            if (self::albumPassword($album) !== '') {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function isLockedOut()
     {
-        $until = $_SESSION[self::LOCKOUT_KEY] ?? 0;
-        return $until > time();
+        return (int) ($_SESSION[self::LOCKOUT_KEY] ?? 0) > time();
     }
 
     public function lockoutSecondsRemaining()
     {
-        $until = $_SESSION[self::LOCKOUT_KEY] ?? 0;
-        return max(0, $until - time());
+        return max(0, (int) ($_SESSION[self::LOCKOUT_KEY] ?? 0) - time());
     }
 
     /**
-     * Verify a submitted password and start an admin session on success.
+     * Verify a submitted password against every album. Succeeds if it
+     * unlocks at least one.
      */
-    public function attemptLogin($submitted)
+    public function attemptLogin($submitted, array $albums)
     {
-        if (!$this->isConfigured()) {
-            Logger::warning('AdminAuth: login attempted but no Admin Password is set in the config sheet');
-            return false;
-        }
-
         if ($this->isLockedOut()) {
             Logger::warning('AdminAuth: login attempted while locked out');
             return false;
         }
 
-        // hash_equals avoids leaking the password through timing differences.
-        if (is_string($submitted) && hash_equals($this->adminPassword, trim($submitted))) {
-            // Prevent session fixation. Guarded because regenerating after
-            // output has started emits a warning and cannot succeed.
-            if (!headers_sent()) {
-                session_regenerate_id(true);
+        $submitted = is_string($submitted) ? trim($submitted) : '';
+
+        if ($submitted !== '') {
+            $matched = $this->albumsMatching($submitted, $albums);
+
+            if (!empty($matched)) {
+                // Prevent session fixation. Guarded because regenerating
+                // after output has started emits a warning and cannot work.
+                if (!headers_sent()) {
+                    session_regenerate_id(true);
+                }
+
+                $_SESSION[self::HASH_KEY] = self::hashPassword($submitted);
+                $_SESSION[self::LAST_ACTIVITY_KEY] = time();
+                unset($_SESSION[self::FAILED_KEY], $_SESSION[self::LOCKOUT_KEY]);
+
+                Logger::info('AdminAuth: admin login succeeded', ['albums_unlocked' => count($matched)]);
+                return true;
             }
-            $_SESSION[self::SESSION_KEY] = true;
-            $_SESSION[self::LAST_ACTIVITY_KEY] = time();
-            unset($_SESSION[self::FAILED_KEY], $_SESSION[self::LOCKOUT_KEY]);
-            Logger::info('AdminAuth: admin login succeeded');
-            return true;
         }
 
-        $failed = ($_SESSION[self::FAILED_KEY] ?? 0) + 1;
+        $failed = ((int) ($_SESSION[self::FAILED_KEY] ?? 0)) + 1;
         $_SESSION[self::FAILED_KEY] = $failed;
 
         if ($failed >= self::MAX_ATTEMPTS) {
@@ -101,12 +109,13 @@ class AdminAuth
     }
 
     /**
-     * True if this session is an authenticated admin and has not gone idle
-     * past the configured timeout.
+     * Whether this session holds an admin password and has not gone idle.
+     * Says nothing about which albums it can reach -- see
+     * authorizedAlbums() and canAdminAlbum().
      */
     public function isLoggedIn()
     {
-        if (empty($_SESSION[self::SESSION_KEY])) {
+        if (empty($_SESSION[self::HASH_KEY])) {
             return false;
         }
 
@@ -114,6 +123,7 @@ class AdminAuth
         $last = (int) ($_SESSION[self::LAST_ACTIVITY_KEY] ?? 0);
 
         if ($timeout > 0 && $last > 0 && (time() - $last) > $timeout) {
+            Logger::info('AdminAuth: admin session timed out');
             $this->logout();
             return false;
         }
@@ -122,19 +132,62 @@ class AdminAuth
         return true;
     }
 
+    /**
+     * The albums this session may administer. Recomputed per request, so a
+     * password changed in the sheet takes effect without waiting for the
+     * session to expire.
+     */
+    public function authorizedAlbums(array $albums)
+    {
+        if (!$this->isLoggedIn()) {
+            return [];
+        }
+
+        $hash = (string) $_SESSION[self::HASH_KEY];
+        $authorized = [];
+
+        foreach ($albums as $album) {
+            $password = self::albumPassword($album);
+            if ($password === '') {
+                continue; // No admin password on this album: never reachable.
+            }
+            if (hash_equals($hash, self::hashPassword($password))) {
+                $authorized[] = $album;
+            }
+        }
+
+        return $authorized;
+    }
+
+    /**
+     * Whether this session may administer one specific album.
+     */
+    public function canAdminAlbum($album)
+    {
+        if (!$this->isLoggedIn() || !is_array($album)) {
+            return false;
+        }
+
+        $password = self::albumPassword($album);
+        if ($password === '') {
+            return false;
+        }
+
+        return hash_equals((string) $_SESSION[self::HASH_KEY], self::hashPassword($password));
+    }
+
     public function logout()
     {
         unset(
-            $_SESSION[self::SESSION_KEY],
+            $_SESSION[self::HASH_KEY],
             $_SESSION[self::LAST_ACTIVITY_KEY],
             $_SESSION[self::CSRF_KEY]
         );
     }
 
     /**
-     * CSRF token for admin actions. Delete and publish are destructive and
-     * irreversible respectively, so they must not be triggerable by a
-     * cross-site form post.
+     * CSRF token for admin actions. Deleting is destructive and publishing
+     * is irreversible, so neither may be triggerable by a cross-site post.
      */
     public function getCsrfToken()
     {
@@ -148,5 +201,35 @@ class AdminAuth
     {
         $expected = $_SESSION[self::CSRF_KEY] ?? '';
         return $expected !== '' && is_string($token) && hash_equals($expected, $token);
+    }
+
+    /**
+     * Albums unlocked by a given plaintext password.
+     */
+    private function albumsMatching($submitted, array $albums)
+    {
+        $matched = [];
+
+        foreach ($albums as $album) {
+            $password = self::albumPassword($album);
+            if ($password !== '' && hash_equals($password, $submitted)) {
+                $matched[] = $album;
+            }
+        }
+
+        return $matched;
+    }
+
+    private static function albumPassword($album)
+    {
+        if (!is_array($album) || !isset($album['admin_password'])) {
+            return '';
+        }
+        return trim((string) $album['admin_password']);
+    }
+
+    private static function hashPassword($password)
+    {
+        return hash('sha256', $password);
     }
 }

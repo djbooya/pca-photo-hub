@@ -123,12 +123,12 @@ class SessionManager
      */
     public function canDeleteFile($fileId)
     {
-        // Admins delete for screening purposes, so they are not restricted
-        // to their own uploads or to the deletion window.
-        if (!empty($_SESSION[AdminAuth::SESSION_KEY])) {
-            return true;
-        }
-
+        // Deliberately no admin bypass here. This is the member-facing path
+        // (public/delete.php), which receives only a file id and so cannot
+        // tell which album the file belongs to -- a session-wide admin flag
+        // would therefore let an admin of one album delete from any other.
+        // Admin deletion goes through admin_action.php instead, which
+        // verifies both album membership and per-album authorization.
         $userFiles = $this->getUserUploadedFiles();
 
         if (!isset($userFiles[$fileId])) {

@@ -19,6 +19,7 @@ use PCAPhotoHub\MediaLink;
 use PCAPhotoHub\MetaGraph;
 
 $loginError = null;
+$accessError = null;
 $fatalError = null;
 $albums = [];
 $selectedAlbum = null;
@@ -33,8 +34,11 @@ $igMax = 10;
 try {
     $driveManager = new GoogleDriveManager($config);
     $sheetsManager = new GoogleSheetsManager($config);
-    $auth = new AdminAuth($config, $sheetsManager->getAdminPassword());
-    $adminConfigured = $auth->isConfigured();
+    $albumManager = new AlbumManager($config, $sheetsManager, $driveManager);
+    $allAlbums = $albumManager->getAllAlbums();
+
+    $auth = new AdminAuth($config);
+    $adminConfigured = $auth->isConfiguredForAny($allAlbums);
 
     if (($_POST['admin_action'] ?? '') === 'logout') {
         $auth->logout();
@@ -46,10 +50,10 @@ try {
         if ($auth->isLockedOut()) {
             $loginError = 'Too many failed attempts. Try again in '
                 . ceil($auth->lockoutSecondsRemaining() / 60) . ' minute(s).';
-        } elseif (!$auth->attemptLogin($_POST['admin_password'] ?? '')) {
+        } elseif (!$auth->attemptLogin($_POST['admin_password'] ?? '', $allAlbums)) {
             $loginError = $auth->isLockedOut()
                 ? 'Too many failed attempts. Try again in 15 minutes.'
-                : 'Incorrect admin password.';
+                : 'That password does not match any album.';
         } else {
             // Redirect after successful login so a refresh does not repost.
             header('Location: admin.php');
@@ -60,8 +64,8 @@ try {
     $isLoggedIn = $auth->isLoggedIn();
 
     if ($isLoggedIn) {
-        $albumManager = new AlbumManager($config, $sheetsManager, $driveManager);
-        $albums = $albumManager->getAllAlbums();
+        // Only the albums this password unlocks -- never the full list.
+        $albums = $auth->authorizedAlbums($allAlbums);
 
         $mediaReady = (new MediaLink($config))->isConfigured();
         $graph = new MetaGraph($config);
@@ -72,9 +76,17 @@ try {
 
         $folderId = $_GET['id'] ?? '';
         if ($folderId !== '') {
-            $selectedAlbum = $albumManager->getAlbumByFolderId($folderId);
-            if ($selectedAlbum) {
+            $candidate = $albumManager->getAlbumByFolderId($folderId);
+
+            // Deliberately identical wording whether the album does not
+            // exist or is simply not covered by this password, so the page
+            // cannot be used to enumerate other albums.
+            if ($candidate && $auth->canAdminAlbum($candidate)) {
+                $selectedAlbum = $candidate;
                 $photos = $driveManager->listFilesInFolder($folderId);
+            } else {
+                Logger::warning('admin.php: album access denied', ['folder_id' => $folderId]);
+                $accessError = 'That album is not available with this password.';
             }
         }
     }
@@ -129,12 +141,15 @@ try {
                     <div class="message warning">
                         <strong>Admin is not set up yet.</strong>
                         Add an <strong>Admin Password</strong> column (column F) to the config
-                        spreadsheet and put a password in it, then make sure
+                        spreadsheet and give at least one album a password, then make sure
                         <code>GOOGLE_SHEETS_CONFIG_RANGE</code> in <code>.env</code> covers
                         column F (for example <code>Config!A:F</code>).
                     </div>
                 <?php else: ?>
-                    <p class="subtitle">Screening and publishing tools for club officers.</p>
+                    <p class="subtitle">
+                        Screening and publishing tools for club officers. Your password opens
+                        the albums it is assigned to in the config sheet.
+                    </p>
 
                     <div class="password-section" style="max-width: 460px;">
                         <?php if ($loginError): ?>
@@ -164,7 +179,18 @@ try {
                     </form>
                 </div>
 
-                <p class="subtitle">Choose an album to screen photos or publish them.</p>
+                <p class="subtitle">
+                    Choose an album to screen photos or publish them.
+                    <?php if (count($albums) === 1): ?>
+                        Your password covers 1 album.
+                    <?php else: ?>
+                        Your password covers <?php echo count($albums); ?> albums.
+                    <?php endif; ?>
+                </p>
+
+                <?php if ($accessError): ?>
+                    <div class="message error"><?php echo htmlspecialchars($accessError); ?></div>
+                <?php endif; ?>
 
                 <?php if (!$mediaReady): ?>
                     <div class="message warning">
@@ -175,7 +201,12 @@ try {
                 <?php endif; ?>
 
                 <?php if (empty($albums)): ?>
-                    <div class="message warning">No albums found in the config spreadsheet.</div>
+                    <div class="message warning">
+                        <strong>No albums are available with this password.</strong>
+                        Admin access is granted per album: the password must appear in the
+                        <strong>Admin Password</strong> column of that album&rsquo;s row in the
+                        config sheet.
+                    </div>
                 <?php else: ?>
                     <div class="albums-grid">
                         <?php foreach ($albums as $album): ?>

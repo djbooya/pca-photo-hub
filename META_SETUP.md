@@ -130,7 +130,7 @@ internet**, because Meta's servers fetch it. Publishing cannot work from `localh
 
 ## Verifying
 
-1. Sign in at `/admin.php` with the password from column F of the config sheet
+1. Sign in at `/admin.php` with an admin password from column F of the config sheet (it opens only the albums that password is assigned to)
 2. Open an album with photos, select two, click **Publish to Facebook**
 3. Check the Page — the album should exist with your chosen cover first
 4. Repeat with **Publish to Instagram**
