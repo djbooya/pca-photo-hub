@@ -307,6 +307,15 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.2.0 (Sep 7, 2026)
+- **Added:** The entire album tile is now a single tap target on albums that are open for uploads, rather than just the small button -- the tap area went from roughly 343×48px to 343×339px on a phone. Closed and upcoming albums stay non-clickable.
+- **Changed:** Theme now follows diablo-pca.org: a **white header** carrying the black club logo (the previous near-black header made the black logo artwork unreadable), **black** album/detail panels with white text, and the club's signature **gold `#f9ab40`** on every call-to-action, status pill, and accent rule -- sampled directly from that site's buttons.
+- **Added:** The official Diablo Region logo, configurable via a new optional `LOGO_URL` in `.env` (defaults to the current lockup, so no `.env` change is required).
+- **Fixed (significant):** `getEnvOptional()`/`requireEnv()` chained `$_ENV[$key] ?? getenv($key) ?? $default`. The `??` operator only falls through on `null`, but `getenv()` returns **`false`** for an unset key -- so the default was never reachable and every optional setting absent from `.env` silently became `false`. In practice that meant `MAX_FILE_SIZE_MB` → `(int)false` = `0`, rejecting **every upload** as "too large", and `ALLOWED_MIME_TYPES` → `['']`, permitting no file type at all. Replaced with an explicit `envLookup()` helper.
+- **Fixed:** Body links now use a darkened gold (`#9a6410`); the brand gold itself does not meet contrast requirements as text on white.
+- **Fixed:** The "Home" and "Back to Albums" links pointed at `/` (the domain root), which breaks under a subdirectory install; both are now relative.
+- **Fixed:** Album tiles in a row are now equal height with their buttons aligned, and the previously unused "coming soon" status style is now actually applied to upcoming albums.
+
 ### v1.1.4 (Sep 7, 2026)
 - **Added:** The root `index.php` redirect now sends explicit `Cache-Control: no-store, no-cache, must-revalidate` headers. A 302 is already non-cacheable per spec, but the CDN in front of this site was observed pinning an older `301` from this URL and replaying it to visitors long after the underlying issue was fixed -- which is very painful to diagnose (HEAD requests showed the correct fresh response while GET requests served the stale cached one).
 - **Note:** If you deploy a redirect fix and still see old behavior, suspect CDN caching. Test with a cache-busting query string (`?cb=$(date +%s)`) to force a miss, then purge the CDN cache.
@@ -417,4 +426,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.1.4 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.2.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

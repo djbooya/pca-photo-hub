@@ -76,7 +76,7 @@ if (file_exists($envPath)) {
 // sets above -- so it always returned false, no matter what .env said.
 if (!function_exists('requireEnv')) {
     function requireEnv($key, $default = null) {
-        $value = $_ENV[$key] ?? getenv($key) ?? $default;
+        $value = envLookup($key, $default);
         if ($value === null) {
             throw new \Exception("Missing required environment variable: $key");
         }
@@ -87,7 +87,32 @@ if (!function_exists('requireEnv')) {
 // Helper function to get optional environment variable
 if (!function_exists('getEnvOptional')) {
     function getEnvOptional($key, $default = null) {
-        return $_ENV[$key] ?? getenv($key) ?? $default;
+        return envLookup($key, $default);
+    }
+}
+
+// Shared lookup: $_ENV first (that's where the .env loader above puts
+// things), then the real process environment, then the default.
+//
+// This deliberately does NOT use "$_ENV[$key] ?? getenv($key) ?? $default".
+// The ?? operator only falls through on null, but getenv() returns FALSE
+// for a key that isn't set -- so that chain returns false and the default
+// is never reached. That silently turned every absent optional setting
+// into false: MAX_FILE_SIZE_MB became (int)false = 0 (rejecting every
+// upload as "too large"), ALLOWED_MIME_TYPES became [''] (permitting no
+// file type at all), and so on.
+if (!function_exists('envLookup')) {
+    function envLookup($key, $default) {
+        if (isset($_ENV[$key]) && $_ENV[$key] !== '') {
+            return $_ENV[$key];
+        }
+
+        $value = getenv($key);
+        if ($value !== false && $value !== '') {
+            return $value;
+        }
+
+        return $default;
     }
 }
 
@@ -132,11 +157,15 @@ if (empty($sheetsConfigId)) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.1.4',
+        'version' => '1.2.0',
         'release_date' => '2026-09-07',
         'debug' => $debugEnabled,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
         'timezone' => getEnvOptional('TIMEZONE', 'America/Los_Angeles'),
+        'logo_url' => getEnvOptional(
+            'LOGO_URL',
+            'https://images.squarespace-cdn.com/content/v1/665cd77fbc252a40f650d79a/b5bd754d-1817-4f92-b1ff-0eadd08f98ee/PCA+Diablo+Logo+2+Black+2000px.png?format=1500w'
+        ),
     ],
 
     'google' => [

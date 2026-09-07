@@ -2,14 +2,23 @@
    PCA Photo Hub - Responsive Stylesheet
    ============================================ */
 
+/* Palette taken from diablo-pca.org: a white header carrying the black
+   logo lockup, black section backgrounds with white text, and the gold
+   (#f9ab40) used on every call-to-action across that site. */
 :root {
-    --primary-color: #c7000a;
-    --secondary-color: #1a1a1a;
-    --accent-color: #ff6b35;
+    --brand-gold: #f9ab40;
+    --brand-gold-dark: #e2942b;
+    --brand-black: #000000;
+
+    --primary-color: #f9ab40;
+    --secondary-color: #000000;
+    --accent-color: #f9ab40;
+    --header-bg: #ffffff;
     --light-bg: #f8f9fa;
     --border-color: #dee2e6;
-    --text-dark: #212529;
+    --text-dark: #1a1a1a;
     --text-light: #6c757d;
+    --link-color: #9a6410;
     --success-color: #28a745;
     --danger-color: #dc3545;
     --warning-color: #ffc107;
@@ -37,14 +46,16 @@ body {
     background-color: #fff;
 }
 
+/* Body links use a darkened gold -- the brand gold itself does not have
+   enough contrast against white for text. */
 a {
-    color: var(--primary-color);
+    color: var(--link-color);
     text-decoration: none;
     transition: color 0.3s ease;
 }
 
 a:hover {
-    color: var(--secondary-color);
+    color: var(--brand-black);
     text-decoration: underline;
 }
 
@@ -57,11 +68,14 @@ button, .btn {
    Header & Navigation
    ============================================ */
 
+/* White header carrying the black logo lockup, matching diablo-pca.org.
+   The logo artwork is black, so the bar behind it must stay light. */
 header {
-    background-color: var(--secondary-color);
-    color: white;
+    background-color: var(--header-bg);
+    color: var(--text-dark);
     padding: 1rem 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-bottom: 3px solid var(--brand-gold);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .header-container {
@@ -71,39 +85,61 @@ header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
 }
 
 .logo {
     display: flex;
     align-items: center;
     gap: 1rem;
+    min-width: 0;
 }
 
+.logo a {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* The logo is a wide (~5.6:1) lockup that already reads "Porsche Club of
+   America / Diablo Region", so it is sized by height and left to scale. */
 .logo img {
-    height: 50px;
+    height: 46px;
     width: auto;
+    max-width: 100%;
+    display: block;
+}
+
+.logo-text {
+    padding-left: 1rem;
+    border-left: 1px solid var(--border-color);
 }
 
 .logo-text h1 {
-    font-size: 1.5rem;
+    font-size: 1.15rem;
     margin: 0;
     font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: 0.01em;
+    line-height: 1.2;
 }
 
 .logo-text p {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     margin: 0;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-light);
 }
 
 nav a {
-    color: white;
-    margin-left: 2rem;
+    color: var(--text-dark);
+    margin-left: 1.75rem;
+    font-weight: 600;
+    font-size: 0.95rem;
     transition: color 0.3s;
+    white-space: nowrap;
 }
 
 nav a:hover {
-    color: var(--accent-color);
+    color: var(--brand-gold-dark);
     text-decoration: none;
 }
 
@@ -178,6 +214,8 @@ h2 {
     margin-top: 2rem;
 }
 
+/* The whole tile is the tap target on open albums (see .album-card-link
+   below), which matters most on touch screens. */
 .album-card {
     background: white;
     border: 1px solid var(--border-color);
@@ -185,15 +223,46 @@ h2 {
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
-.album-card:hover {
+/* Anchor wrapping an entire open album tile. Resets link styling so the
+   card's own typography shows through. */
+.album-card-link {
+    display: block;
+    height: 100%;
+    color: inherit;
+    text-decoration: none;
+}
+
+.album-card-link:hover,
+.album-card-link:focus {
+    color: inherit;
+    text-decoration: none;
+}
+
+.album-card-link:hover .album-card,
+.album-card-link:focus .album-card {
     transform: translateY(-4px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    border-color: var(--brand-gold);
 }
 
+.album-card-link:focus-visible .album-card {
+    outline: 3px solid var(--brand-gold);
+    outline-offset: 2px;
+}
+
+.album-card-link:hover .btn-album {
+    background-color: var(--brand-gold-dark);
+}
+
+/* Black panel with white text, mirroring the hero treatment on
+   diablo-pca.org. */
 .album-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    background: var(--brand-black);
     color: white;
     padding: 2rem 1.5rem;
     text-align: center;
@@ -201,44 +270,49 @@ h2 {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    border-bottom: 3px solid var(--brand-gold);
 }
 
 .album-header h3 {
     font-size: 1.3rem;
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.75rem 0;
+    color: white;
 }
 
 .album-status {
     font-size: 0.85rem;
-    opacity: 0.9;
+    align-self: center;
+    padding: 0.25rem 0.85rem;
+    border-radius: 20px;
+    font-weight: 600;
 }
 
 .album-status.accepting {
-    background-color: rgba(40, 167, 69, 0.2);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    display: inline-block;
+    background-color: var(--brand-gold);
+    color: var(--brand-black);
 }
 
 .album-status.coming-soon {
-    background-color: rgba(255, 193, 7, 0.2);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    display: inline-block;
+    background-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
 }
 
 .album-status.closed {
-    background-color: rgba(220, 53, 69, 0.2);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    display: inline-block;
+    background-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .album-body {
     padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+/* Pins the button to the bottom so tiles of differing text length still
+   line their buttons up across the grid. */
+.album-body .btn-album {
+    margin-top: auto;
 }
 
 .album-notes {
@@ -257,26 +331,33 @@ h2 {
     margin: 0.25rem 0;
 }
 
+/* Gold CTA with black text, matching every call-to-action on
+   diablo-pca.org. On open tiles this is a visual affordance only -- the
+   whole tile is the actual link. */
 .btn-album {
-    display: inline-block;
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.75rem 1.5rem;
+    display: block;
+    background-color: var(--brand-gold);
+    color: var(--brand-black);
+    padding: 0.85rem 1.5rem;
     border: none;
     border-radius: 4px;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 700;
+    text-align: center;
     transition: background-color 0.3s;
     width: 100%;
 }
 
 .btn-album:hover {
-    background-color: var(--secondary-color);
+    background-color: var(--brand-gold-dark);
+    color: var(--brand-black);
     text-decoration: none;
 }
 
-.btn-album:disabled {
-    background-color: var(--text-light);
+.btn-album:disabled,
+.btn-album.is-disabled {
+    background-color: #e9ecef;
+    color: var(--text-light);
     cursor: not-allowed;
 }
 
@@ -285,10 +366,11 @@ h2 {
    ============================================ */
 
 .album-detail-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    background: var(--brand-black);
     color: white;
     padding: 3rem 0;
     margin-bottom: 2rem;
+    border-bottom: 3px solid var(--brand-gold);
 }
 
 .album-detail-header h1 {
@@ -360,24 +442,24 @@ h2 {
 .form-group input:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(199, 0, 10, 0.1);
+    border-color: var(--brand-gold);
+    box-shadow: 0 0 0 3px rgba(249, 171, 64, 0.25);
 }
 
 .btn-primary {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.75rem 2rem;
+    background-color: var(--brand-gold);
+    color: var(--brand-black);
+    padding: 0.85rem 2rem;
     border: none;
     border-radius: 4px;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
     transition: background-color 0.3s;
 }
 
 .btn-primary:hover {
-    background-color: var(--secondary-color);
+    background-color: var(--brand-gold-dark);
 }
 
 .btn-primary:disabled {
@@ -490,8 +572,8 @@ h2 {
 
 .drag-drop-area:hover,
 .drag-drop-area.dragover {
-    background-color: rgba(199, 0, 10, 0.05);
-    border-color: var(--secondary-color);
+    background-color: rgba(249, 171, 64, 0.12);
+    border-color: var(--brand-gold-dark);
 }
 
 .drag-drop-icon {
@@ -626,18 +708,38 @@ footer {
     .header-container {
         flex-direction: column;
         text-align: center;
+        gap: 0.75rem;
     }
 
+    .logo {
+        flex-direction: column;
+        gap: 0.6rem;
+        width: 100%;
+    }
+
+    /* The logo is a wide lockup -- cap by width on narrow screens so it
+       stays legible instead of overflowing. */
     .logo img {
-        height: 40px;
+        height: auto;
+        width: 100%;
+        max-width: 260px;
+    }
+
+    .logo-text {
+        padding-left: 0;
+        border-left: none;
+        padding-top: 0.6rem;
+        border-top: 1px solid var(--border-color);
+        width: 100%;
     }
 
     .logo-text h1 {
-        font-size: 1.2rem;
+        font-size: 1.05rem;
     }
 
     nav a {
-        margin-left: 1rem;
+        margin-left: 0.75rem;
+        margin-right: 0.75rem;
         font-size: 0.9rem;
     }
 

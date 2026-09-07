@@ -36,15 +36,17 @@ try {
     <header>
         <div class="header-container">
             <div class="logo">
-                <img src="https://diablo-pca.org/wp-content/uploads/2023/01/Porsche-Club-of-America-Diablo-Region-Logo.png"
-                     alt="Diablo PCA Logo" onerror="this.style.display='none'">
+                <a href="https://diablo-pca.org/" target="_blank" rel="noopener">
+                    <img src="<?php echo htmlspecialchars($config['app']['logo_url']); ?>"
+                         alt="Porsche Club of America - Diablo Region">
+                </a>
                 <div class="logo-text">
                     <h1><?php echo htmlspecialchars($config['app']['name']); ?></h1>
                     <p>Share your event photos easily</p>
                 </div>
             </div>
             <nav>
-                <a href="/">Home</a>
+                <a href="index.php">Home</a>
             </nav>
         </div>
     </header>
@@ -80,46 +82,66 @@ try {
             <?php else: ?>
                 <div class="albums-grid">
                     <?php foreach ($albums as $album): ?>
-                        <?php $albumInfo = $albumManager->getAlbumInfo($album); ?>
-                        <div class="album-card">
-                            <div class="album-header">
-                                <h3><?php echo htmlspecialchars($albumInfo['name']); ?></h3>
-                                <div class="album-status <?php echo $albumInfo['accepting_uploads'] ? 'accepting' : 'closed'; ?>">
-                                    <?php echo htmlspecialchars($albumInfo['status']); ?>
+                        <?php
+                            $albumInfo = $albumManager->getAlbumInfo($album);
+                            $isOpen = $albumInfo['accepting_uploads'];
+                            $isComingSoon = !$isOpen && stripos($albumInfo['status'], 'coming soon') === 0;
+
+                            if ($isOpen) {
+                                $statusClass = 'accepting';
+                            } elseif ($isComingSoon) {
+                                $statusClass = 'coming-soon';
+                            } else {
+                                $statusClass = 'closed';
+                            }
+                        ?>
+
+                        <?php if ($isOpen): ?>
+                        <!-- Open albums: the entire tile is the tap target, which is
+                             far easier to hit on a phone than a single small button.
+                             The CTA inside is a span, not a nested anchor. -->
+                        <a class="album-card-link"
+                           href="album.php?id=<?php echo urlencode($albumInfo['folder_id']); ?>"
+                           aria-label="Open album <?php echo htmlspecialchars($albumInfo['name']); ?> to view and upload photos">
+                        <?php endif; ?>
+
+                            <div class="album-card">
+                                <div class="album-header">
+                                    <h3><?php echo htmlspecialchars($albumInfo['name']); ?></h3>
+                                    <div class="album-status <?php echo $statusClass; ?>">
+                                        <?php echo htmlspecialchars($albumInfo['status']); ?>
+                                    </div>
+                                </div>
+
+                                <div class="album-body">
+                                    <?php if (!empty($albumInfo['notes'])): ?>
+                                        <p class="album-notes">
+                                            <?php echo htmlspecialchars($albumInfo['notes']); ?>
+                                        </p>
+                                    <?php endif; ?>
+
+                                    <div class="album-dates">
+                                        <?php if ($albumInfo['upload_start']): ?>
+                                            <p><strong>Opens:</strong> <?php echo $albumInfo['upload_start']; ?></p>
+                                        <?php endif; ?>
+                                        <?php if ($albumInfo['upload_end']): ?>
+                                            <p><strong>Closes:</strong> <?php echo $albumInfo['upload_end']; ?></p>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <?php if ($isOpen): ?>
+                                        <span class="btn-album">Upload Photos</span>
+                                    <?php elseif ($isComingSoon): ?>
+                                        <span class="btn-album is-disabled">Coming Soon</span>
+                                    <?php else: ?>
+                                        <span class="btn-album is-disabled">Uploads Closed</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
 
-                            <div class="album-body">
-                                <?php if (!empty($albumInfo['notes'])): ?>
-                                    <p class="album-notes">
-                                        <?php echo htmlspecialchars($albumInfo['notes']); ?>
-                                    </p>
-                                <?php endif; ?>
-
-                                <div class="album-dates">
-                                    <?php if ($albumInfo['upload_start']): ?>
-                                        <p><strong>Opens:</strong> <?php echo $albumInfo['upload_start']; ?></p>
-                                    <?php endif; ?>
-                                    <?php if ($albumInfo['upload_end']): ?>
-                                        <p><strong>Closes:</strong> <?php echo $albumInfo['upload_end']; ?></p>
-                                    <?php endif; ?>
-                                </div>
-
-                                <?php if ($albumInfo['accepting_uploads']): ?>
-                                    <a href="album.php?id=<?php echo urlencode($albumInfo['folder_id']); ?>" class="btn-album">
-                                        Upload Photos
-                                    </a>
-                                <?php elseif ($albumInfo['status'] === 'Closed'): ?>
-                                    <button class="btn-album" disabled>
-                                        Uploads Closed
-                                    </button>
-                                <?php else: ?>
-                                    <button class="btn-album" disabled>
-                                        Coming Soon
-                                    </button>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+                        <?php if ($isOpen): ?>
+                        </a>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>

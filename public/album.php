@@ -74,15 +74,17 @@ try {
     <header>
         <div class="header-container">
             <div class="logo">
-                <img src="https://diablo-pca.org/wp-content/uploads/2023/01/Porsche-Club-of-America-Diablo-Region-Logo.png"
-                     alt="Diablo PCA Logo" onerror="this.style.display='none'">
+                <a href="https://diablo-pca.org/" target="_blank" rel="noopener">
+                    <img src="<?php echo htmlspecialchars($config['app']['logo_url']); ?>"
+                         alt="Porsche Club of America - Diablo Region">
+                </a>
                 <div class="logo-text">
                     <h1><?php echo htmlspecialchars($config['app']['name']); ?></h1>
                     <p>Share your event photos easily</p>
                 </div>
             </div>
             <nav>
-                <a href="/">← Back to Albums</a>
+                <a href="index.php">← Back to Albums</a>
             </nav>
         </div>
     </header>
