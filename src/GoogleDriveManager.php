@@ -101,10 +101,22 @@ class GoogleDriveManager
                 'spaces' => 'drive',
                 'fields' => 'files(id, name, createdTime, modifiedTime)',
                 'pageSize' => 100,
+                // Required for folders that live inside a Shared Drive --
+                // without these, the query silently scopes to "My Drive"
+                // only and returns zero results even with correct sharing.
+                'supportsAllDrives' => true,
+                'includeItemsFromAllDrives' => true,
             ]);
 
             $files = $results->getFiles() ?: [];
             Logger::debug('GoogleDriveManager: listRootFolders succeeded', ['folder_count' => count($files)]);
+
+            if (count($files) === 0) {
+                Logger::warning('GoogleDriveManager: root folder returned zero subfolders', [
+                    'root_folder_id' => $rootFolderId,
+                    'possible_causes' => 'Wrong folder ID, folder has no subfolders yet, or subfolder names in Drive do not match the "Album Name" column in Google Sheets exactly (case-sensitive).',
+                ]);
+            }
 
             return $files;
         } catch (\Exception $e) {
@@ -132,6 +144,8 @@ class GoogleDriveManager
                 'fields' => 'files(id, name, mimeType, size, createdTime, modifiedTime, webContentLink, thumbnailLink)',
                 'pageSize' => 1000,
                 'orderBy' => 'createdTime desc',
+                'supportsAllDrives' => true,
+                'includeItemsFromAllDrives' => true,
             ]);
 
             $files = $results->getFiles() ?: [];
@@ -176,6 +190,7 @@ class GoogleDriveManager
                 'data' => fopen($filePath, 'r'),
                 'mimeType' => $mimeType,
                 'uploadType' => 'multipart',
+                'supportsAllDrives' => true,
             ]);
 
             Logger::info('GoogleDriveManager: file uploaded', ['folder_id' => $folderId, 'file_name' => $fileName, 'file_id' => $result->getId()]);
@@ -203,7 +218,7 @@ class GoogleDriveManager
     public function deleteFile($fileId)
     {
         try {
-            $this->service->files->delete($fileId);
+            $this->service->files->delete($fileId, ['supportsAllDrives' => true]);
             Logger::info('GoogleDriveManager: file deleted', ['file_id' => $fileId]);
             return true;
         } catch (\Exception $e) {
@@ -223,6 +238,7 @@ class GoogleDriveManager
         try {
             $file = $this->service->files->get($fileId, [
                 'fields' => 'id, name, mimeType, size, createdTime, modifiedTime, webContentLink, thumbnailLink, parents',
+                'supportsAllDrives' => true,
             ]);
 
             return [
@@ -270,6 +286,7 @@ class GoogleDriveManager
 
             $result = $this->service->files->create($file, [
                 'fields' => 'id, name',
+                'supportsAllDrives' => true,
             ]);
 
             return [

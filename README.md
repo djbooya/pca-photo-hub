@@ -278,6 +278,10 @@ Before digging further, set `APP_DEBUG=true` in `.env` and reload the failing pa
 - Confirm service account email has access to root folder
 - Check Google Drive API is enabled in Cloud Console
 
+### Using a Shared Drive (Team Drive)?
+
+If your root folder lives inside a **Shared Drive** rather than someone's personal "My Drive", sharing a folder to the service account's email is not always enough on its own -- for full reliability, add the service account as an actual **member of the Shared Drive** (Shared Drive → Manage members → add the `client_email` from your service account JSON, Content Manager role or higher). Sharing an individual subfolder within a Shared Drive can work depending on the Shared Drive's sharing settings, but Drive membership is the setup Google documents as supported. If `storage/logs/debug.log` still shows `folder_count: 0` after confirming Shared Drive membership, double-check `GOOGLE_DRIVE_ROOT_FOLDER_ID` in `.env` is the folder's ID (from its URL), not the Shared Drive's own ID.
+
 ### Albums not showing
 
 - Verify folder names match exactly (case-sensitive)
@@ -298,6 +302,11 @@ Before digging further, set `APP_DEBUG=true` in `.env` and reload the failing pa
 - Clear browser cookies and try again
 
 ## Release Notes
+
+### v1.0.7 (Sep 7, 2026)
+- **Fixed:** Root folder and album folders returning zero results (`listRootFolders succeeded {"folder_count":0}` in the debug log) when the root folder lives inside a **Shared Drive** rather than a personal "My Drive" -- Google Drive's `files.list` silently scopes to "My Drive" only unless `supportsAllDrives` and `includeItemsFromAllDrives` are explicitly passed, regardless of sharing permissions being correct
+- **Fixed:** Added `supportsAllDrives: true` to every Drive API call (list, upload, delete, get metadata, create folder) so the app works correctly with folders/files stored in a Shared Drive
+- **Added:** A warning is now logged (visible with `APP_DEBUG=true`) whenever the root folder query returns zero subfolders, listing the likely causes to check next
 
 ### v1.0.6 (Sep 7, 2026)
 - **Fixed (root cause):** The persistent `GOOGLE_SERVICE_ACCOUNT_JSON is not set in .env` error, found using the v1.0.5 debug logs, was caused by naming a helper function `getEnv()`. PHP function names are case-insensitive, so `getEnv()` is literally the same function as PHP's built-in `getenv()` and cannot be overridden -- the `function_exists('getEnv')` guard added in v1.0.1 was silently detecting the built-in and skipping our version, so every `getEnv(...)` call was secretly invoking PHP's real `getenv()`, which only reads the OS process environment and knows nothing about `.env` values. It always returned `false`.
@@ -369,4 +378,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.6 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.7 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
