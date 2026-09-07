@@ -15,17 +15,21 @@ if (file_exists(__DIR__ . '/../.env')) {
 }
 
 // Helper function to get environment variable with default
-function getEnv($key, $default = null) {
-    $value = $_ENV[$key] ?? getenv($key) ?? $default;
-    if ($value === null) {
-        throw new \Exception("Missing required environment variable: $key");
+if (!function_exists('getEnv')) {
+    function getEnv($key, $default = null) {
+        $value = $_ENV[$key] ?? getenv($key) ?? $default;
+        if ($value === null) {
+            throw new \Exception("Missing required environment variable: $key");
+        }
+        return $value;
     }
-    return $value;
 }
 
 // Helper function to get optional environment variable
-function getEnvOptional($key, $default = null) {
-    return $_ENV[$key] ?? getenv($key) ?? $default;
+if (!function_exists('getEnvOptional')) {
+    function getEnvOptional($key, $default = null) {
+        return $_ENV[$key] ?? getenv($key) ?? $default;
+    }
 }
 
 // Application Configuration
