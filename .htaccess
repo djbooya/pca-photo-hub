@@ -1,38 +1,39 @@
 # ============================================================
 # PCA Photo Hub - Project Root Protection
 # ============================================================
-# This file matters ONLY when the whole project folder sits under the
-# web server's document root (e.g. https://example.com/pca-photo-hub/)
-# instead of the document root pointing directly at public/. In that
-# layout, without this file, .env, your Google service account JSON
-# credentials, config/, src/, storage/, and vendor/ would all be
-# directly downloadable by anyone who requests them by URL.
+# Blocks direct access to sensitive files when the whole project sits
+# under the web server's document root (e.g.
+# https://example.com/pca-photo-hub/) instead of the document root
+# pointing directly at public/. Without this, .env, your Google
+# service account JSON credentials (any *.json file at this level),
+# and the config/src/storage/vendor directories would be directly
+# downloadable by anyone who requests them by URL.
 #
-# Everything at this level is denied by default; only index.php (which
-# just redirects to public/, the real application) is allowed through.
-# public/ has its own .htaccess that explicitly re-allows itself.
+# This blocks specific files/directories by name rather than "deny
+# everything, then re-allow public/" -- the latter depends on
+# Require/Order directives correctly cascading down into, and being
+# overridden within, public/'s own .htaccess, which does not behave
+# consistently across every host/CDN combination. RewriteRules are
+# scoped to this directory and only match patterns that appear at this
+# level, so they never affect anything inside public/.
 #
-# If your host ignores .htaccess (AllowOverride None), this file does
-# nothing -- as a second line of defense, keep .env and your service
+# If your host ignores .htaccess (AllowOverride None), none of this
+# applies -- as a second line of defense, keep .env and your service
 # account JSON outside the web-servable tree entirely if your hosting
 # panel allows it (e.g. one directory above this one).
 
-<IfModule mod_authz_core.c>
-    Require all denied
-</IfModule>
-<IfModule !mod_authz_core.c>
-    Order deny,allow
-    Deny from all
-</IfModule>
+<IfModule mod_rewrite.c>
+    RewriteEngine On
 
-<Files "index.php">
-    <IfModule mod_authz_core.c>
-        Require all granted
-    </IfModule>
-    <IfModule !mod_authz_core.c>
-        Order allow,deny
-        Allow from all
-    </IfModule>
-</Files>
+    # Sensitive directories
+    RewriteRule ^(config|src|storage|vendor)(/|$) - [F,L]
+
+    # Dotfiles (.env, .git, etc.) -- matches a dot starting a path segment
+    RewriteRule (^|/)\. - [F,L]
+
+    # Credentials and project files that may live at this level
+    RewriteRule \.(json|log|lock)$ - [F,L]
+    RewriteRule ^(README|GOOGLE_SETUP|DEPLOYMENT|GITHUB_PUSH|SUMMARY)\.md$ - [F,L]
+</IfModule>
 
 Options -Indexes

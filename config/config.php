@@ -132,7 +132,7 @@ if (empty($sheetsConfigId)) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.1.2',
+        'version' => '1.1.3',
         'release_date' => '2026-09-07',
         'debug' => $debugEnabled,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
