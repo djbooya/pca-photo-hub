@@ -307,6 +307,10 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.1.2 (Sep 7, 2026)
+- **Fixed:** The v1.1.1 subdirectory redirect (root `index.php`) could loop endlessly on some hosts -- it computed the redirect target from `dirname($_SERVER['SCRIPT_NAME'])`, but `SCRIPT_NAME`'s shape for a directory-index request (no filename in the URL) varies by SAPI. On PHP-FPM/LiteSpeed-style setups it can report just the directory itself (e.g. `/pca-photo-hub/`), and `dirname()` on that strips the whole subdirectory segment, sending the redirect to `/public/` at the domain root instead of `/pca-photo-hub/public/` -- which doesn't exist there and can bounce into a loop depending on the host's catch-all handling.
+- **Fixed:** Now derives the redirect target from `REQUEST_URI` (what the client actually requested) instead, which is consistent across SAPIs
+
 ### v1.1.1 (Sep 7, 2026)
 - **Added:** Subdirectory installation support -- visiting the project root (e.g. `https://yourdomain.com/pca-photo-hub/`) now redirects to `public/`, the real application, via a new root-level `index.php`. Needed on shared hosts that only let you point a domain at one fixed document root, with no way to make it `public/` inside a subfolder.
 - **Security fix:** Added a root-level `.htaccess` that denies direct access to everything except that redirect -- previously, installing the whole project under the web root (rather than pointing the document root at `public/`) meant `.env`, any service account JSON credentials file, `config/`, `src/`, `storage/`, and `vendor/` were all directly downloadable by URL to anyone who requested them.
@@ -405,4 +409,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.1.1 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.1.2 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
