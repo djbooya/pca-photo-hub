@@ -30,13 +30,17 @@ class GoogleSheetsManager
     private function initializeClient()
     {
         $jsonPath = $this->config['google']['service_account_json'];
-        $this->validateServiceAccountJson($jsonPath);
+        Logger::debug('GoogleSheetsManager: validating service account JSON', ['path' => $jsonPath]);
+        $email = $this->validateServiceAccountJson($jsonPath);
+
+        Logger::debug('GoogleSheetsManager: service account JSON is valid', ['client_email' => $email]);
 
         $this->client = new Client();
         $this->client->setAuthConfig($jsonPath);
         $this->client->addScope(Sheets::SPREADSHEETS_READONLY);
 
         $this->service = new Sheets($this->client);
+        Logger::debug('GoogleSheetsManager: Google Sheets client initialized');
     }
 
     /**
@@ -44,6 +48,9 @@ class GoogleSheetsManager
      * before handing it to the Google client. Without this check, a bad path
      * fails silently deep inside the client library and manifests as a
      * confusing "array offset on false" warning followed by broken auth.
+     *
+     * Returns the service account's client_email on success (useful for
+     * logging -- it's the address that must be shared on the Sheet/Drive).
      */
     private function validateServiceAccountJson($jsonPath)
     {
@@ -52,10 +59,12 @@ class GoogleSheetsManager
         }
 
         if (!file_exists($jsonPath)) {
+            Logger::error('Service account JSON file not found', ['path' => $jsonPath]);
             throw new \Exception("Service account JSON file not found at: {$jsonPath}");
         }
 
         if (!is_readable($jsonPath)) {
+            Logger::error('Service account JSON file is not readable', ['path' => $jsonPath]);
             throw new \Exception("Service account JSON file is not readable (check permissions): {$jsonPath}");
         }
 
@@ -63,12 +72,20 @@ class GoogleSheetsManager
         $decoded = json_decode($contents, true);
 
         if ($decoded === null) {
+            Logger::error('Service account JSON file is not valid JSON', ['path' => $jsonPath]);
             throw new \Exception("Service account JSON file is not valid JSON: {$jsonPath}");
         }
 
         if (empty($decoded['client_email']) || empty($decoded['private_key'])) {
+            Logger::error('Service account JSON file is missing required fields', [
+                'path' => $jsonPath,
+                'has_client_email' => !empty($decoded['client_email']),
+                'has_private_key' => !empty($decoded['private_key']),
+            ]);
             throw new \Exception("Service account JSON file is missing required fields (client_email/private_key): {$jsonPath}");
         }
+
+        return $decoded['client_email'];
     }
 
     /**
@@ -83,6 +100,7 @@ class GoogleSheetsManager
         if (file_exists($cacheFile)) {
             $fileAge = time() - filemtime($cacheFile);
             if ($fileAge < $this->cacheTTL) {
+                Logger::debug('GoogleSheetsManager: returning cached album config', ['age_seconds' => $fileAge]);
                 return json_decode(file_get_contents($cacheFile), true);
             }
         }
@@ -104,12 +122,19 @@ class GoogleSheetsManager
      */
     private function fetchFromSheets()
     {
-        try {
-            $spreadsheetId = $this->config['google']['sheets']['config_id'];
-            $range = $this->config['google']['sheets']['config_range'];
+        $spreadsheetId = $this->config['google']['sheets']['config_id'];
+        $range = $this->config['google']['sheets']['config_range'];
 
+        Logger::debug('GoogleSheetsManager: fetching from Google Sheets API', [
+            'spreadsheet_id' => $spreadsheetId,
+            'range' => $range,
+        ]);
+
+        try {
             $response = $this->service->spreadsheets_values->get($spreadsheetId, $range);
             $values = $response->getValues();
+
+            Logger::debug('GoogleSheetsManager: fetch succeeded', ['row_count' => count($values ?? [])]);
 
             if (empty($values)) {
                 return [];
@@ -139,7 +164,12 @@ class GoogleSheetsManager
 
             return $albums;
         } catch (\Exception $e) {
-            throw new \Exception("Failed to fetch album config: " . $e->getMessage());
+            Logger::error('GoogleSheetsManager: fetch failed', [
+                'spreadsheet_id' => $spreadsheetId,
+                'range' => $range,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to fetch album config: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 

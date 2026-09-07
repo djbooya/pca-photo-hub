@@ -27,13 +27,17 @@ class GoogleDriveManager
     private function initializeClient()
     {
         $jsonPath = $this->config['google']['service_account_json'];
-        $this->validateServiceAccountJson($jsonPath);
+        Logger::debug('GoogleDriveManager: validating service account JSON', ['path' => $jsonPath]);
+        $email = $this->validateServiceAccountJson($jsonPath);
+
+        Logger::debug('GoogleDriveManager: service account JSON is valid', ['client_email' => $email]);
 
         $this->client = new Client();
         $this->client->setAuthConfig($jsonPath);
         $this->client->addScope(Drive::DRIVE);
 
         $this->service = new Drive($this->client);
+        Logger::debug('GoogleDriveManager: Google Drive client initialized');
     }
 
     /**
@@ -41,6 +45,9 @@ class GoogleDriveManager
      * before handing it to the Google client. Without this check, a bad path
      * fails silently deep inside the client library and manifests as a
      * confusing "array offset on false" warning followed by broken auth.
+     *
+     * Returns the service account's client_email on success (useful for
+     * logging -- it's the address that must be shared on the Drive folder).
      */
     private function validateServiceAccountJson($jsonPath)
     {
@@ -49,10 +56,12 @@ class GoogleDriveManager
         }
 
         if (!file_exists($jsonPath)) {
+            Logger::error('Service account JSON file not found', ['path' => $jsonPath]);
             throw new \Exception("Service account JSON file not found at: {$jsonPath}");
         }
 
         if (!is_readable($jsonPath)) {
+            Logger::error('Service account JSON file is not readable', ['path' => $jsonPath]);
             throw new \Exception("Service account JSON file is not readable (check permissions): {$jsonPath}");
         }
 
@@ -60,12 +69,20 @@ class GoogleDriveManager
         $decoded = json_decode($contents, true);
 
         if ($decoded === null) {
+            Logger::error('Service account JSON file is not valid JSON', ['path' => $jsonPath]);
             throw new \Exception("Service account JSON file is not valid JSON: {$jsonPath}");
         }
 
         if (empty($decoded['client_email']) || empty($decoded['private_key'])) {
+            Logger::error('Service account JSON file is missing required fields', [
+                'path' => $jsonPath,
+                'has_client_email' => !empty($decoded['client_email']),
+                'has_private_key' => !empty($decoded['private_key']),
+            ]);
             throw new \Exception("Service account JSON file is missing required fields (client_email/private_key): {$jsonPath}");
         }
+
+        return $decoded['client_email'];
     }
 
     /**
@@ -73,8 +90,10 @@ class GoogleDriveManager
      */
     public function listRootFolders()
     {
+        $rootFolderId = $this->config['google']['drive']['root_folder_id'];
+        Logger::debug('GoogleDriveManager: listing root folders', ['root_folder_id' => $rootFolderId]);
+
         try {
-            $rootFolderId = $this->config['google']['drive']['root_folder_id'];
             $query = "'{$rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
 
             $results = $this->service->files->listFiles([
@@ -84,9 +103,16 @@ class GoogleDriveManager
                 'pageSize' => 100,
             ]);
 
-            return $results->getFiles() ?: [];
+            $files = $results->getFiles() ?: [];
+            Logger::debug('GoogleDriveManager: listRootFolders succeeded', ['folder_count' => count($files)]);
+
+            return $files;
         } catch (\Exception $e) {
-            throw new \Exception("Failed to list folders: " . $e->getMessage());
+            Logger::error('GoogleDriveManager: listRootFolders failed', [
+                'root_folder_id' => $rootFolderId,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to list folders: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 
@@ -95,6 +121,8 @@ class GoogleDriveManager
      */
     public function listFilesInFolder($folderId)
     {
+        Logger::debug('GoogleDriveManager: listing files in folder', ['folder_id' => $folderId]);
+
         try {
             $query = "'{$folderId}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false";
 
@@ -106,9 +134,16 @@ class GoogleDriveManager
                 'orderBy' => 'createdTime desc',
             ]);
 
-            return $results->getFiles() ?: [];
+            $files = $results->getFiles() ?: [];
+            Logger::debug('GoogleDriveManager: listFilesInFolder succeeded', ['file_count' => count($files)]);
+
+            return $files;
         } catch (\Exception $e) {
-            throw new \Exception("Failed to list files: " . $e->getMessage());
+            Logger::error('GoogleDriveManager: listFilesInFolder failed', [
+                'folder_id' => $folderId,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to list files: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 
@@ -143,6 +178,8 @@ class GoogleDriveManager
                 'uploadType' => 'multipart',
             ]);
 
+            Logger::info('GoogleDriveManager: file uploaded', ['folder_id' => $folderId, 'file_name' => $fileName, 'file_id' => $result->getId()]);
+
             return [
                 'id' => $result->getId(),
                 'name' => $result->getName(),
@@ -151,7 +188,12 @@ class GoogleDriveManager
                 'webContentLink' => $result->getWebContentLink(),
             ];
         } catch (\Exception $e) {
-            throw new \Exception("Failed to upload file: " . $e->getMessage());
+            Logger::error('GoogleDriveManager: upload failed', [
+                'folder_id' => $folderId,
+                'file_name' => $fileName,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to upload file: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 
@@ -162,9 +204,14 @@ class GoogleDriveManager
     {
         try {
             $this->service->files->delete($fileId);
+            Logger::info('GoogleDriveManager: file deleted', ['file_id' => $fileId]);
             return true;
         } catch (\Exception $e) {
-            throw new \Exception("Failed to delete file: " . $e->getMessage());
+            Logger::error('GoogleDriveManager: delete failed', [
+                'file_id' => $fileId,
+                'raw_error' => substr($e->getMessage(), 0, 2000),
+            ]);
+            throw new \Exception('Failed to delete file: ' . ErrorSummarizer::summarize($e->getMessage()));
         }
     }
 

@@ -21,6 +21,7 @@ Thumbs.db
 
 # Application
 config/service-account.json
+diablo.json
 storage/cache/*
 storage/uploads/*
 !storage/cache/.gitkeep

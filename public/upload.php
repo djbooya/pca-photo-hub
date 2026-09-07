@@ -11,6 +11,7 @@ $config = require_once __DIR__ . '/init.php';
 use PCAPhotoHub\GoogleDriveManager;
 use PCAPhotoHub\FileUploadHandler;
 use PCAPhotoHub\SessionManager;
+use PCAPhotoHub\Logger;
 
 try {
     // Validate request
@@ -70,10 +71,16 @@ try {
     ]);
 
 } catch (\Exception $e) {
+    Logger::error('upload.php: upload failed', ['message' => $e->getMessage()]);
+    error_log("Upload error: " . $e->getMessage());
+
     http_response_code(400);
-    echo json_encode([
+    $response = [
         'success' => false,
         'error' => $e->getMessage(),
-    ]);
-    error_log("Upload error: " . $e->getMessage());
+    ];
+    if (Logger::isEnabled()) {
+        $response['debug'] = Logger::getEntries();
+    }
+    echo json_encode($response);
 }

@@ -10,6 +10,7 @@ $config = require_once __DIR__ . '/init.php';
 
 use PCAPhotoHub\GoogleDriveManager;
 use PCAPhotoHub\SessionManager;
+use PCAPhotoHub\Logger;
 
 try {
     // Validate request
@@ -45,10 +46,16 @@ try {
     ]);
 
 } catch (\Exception $e) {
+    Logger::error('delete.php: delete failed', ['message' => $e->getMessage()]);
+    error_log("Delete error: " . $e->getMessage());
+
     http_response_code(400);
-    echo json_encode([
+    $response = [
         'success' => false,
         'error' => $e->getMessage(),
-    ]);
-    error_log("Delete error: " . $e->getMessage());
+    ];
+    if (Logger::isEnabled()) {
+        $response['debug'] = Logger::getEntries();
+    }
+    echo json_encode($response);
 }

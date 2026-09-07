@@ -10,6 +10,7 @@ use PCAPhotoHub\GoogleDriveManager;
 use PCAPhotoHub\GoogleSheetsManager;
 use PCAPhotoHub\AlbumManager;
 use PCAPhotoHub\SessionManager;
+use PCAPhotoHub\Logger;
 
 $folderId = $_GET['id'] ?? null;
 $albumPasswordKey = "album_password_" . ($folderId ?? '');
@@ -56,6 +57,7 @@ try {
         $userUploadedFiles = $sessionManager->getUserUploadedFilesInFolder($folderId);
     }
 } catch (\Exception $e) {
+    Logger::error('album.php: failed to load album', ['folder_id' => $folderId, 'message' => $e->getMessage()]);
     $error = "Error loading album: " . $e->getMessage();
 }
 ?>
@@ -127,6 +129,9 @@ try {
                     <strong>Error:</strong> <?php echo htmlspecialchars($error); ?>
                 </div>
             <?php endif; ?>
+
+            <!-- Debug Panel (only rendered when APP_DEBUG=true) -->
+            <?php echo Logger::renderHtml(); ?>
 
             <!-- Password Form (if needed) -->
             <?php if ($album['password'] && !$isPasswordVerified): ?>

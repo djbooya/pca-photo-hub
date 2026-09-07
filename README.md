@@ -268,6 +268,10 @@ Album configuration is stored in a Google Sheet with these columns:
 
 ## Troubleshooting
 
+### Turn on debug mode first
+
+Before digging further, set `APP_DEBUG=true` in `.env` and reload the failing page. A green debug panel will appear on-screen showing exactly what `.env` values were loaded, whether the service account JSON validated, and the raw result of every Google API call. The same detail is written to `storage/logs/debug.log`. Set it back to `false` when done -- nothing is logged or shown while it's false.
+
 ### Can't connect to Google Drive
 
 - Verify service account JSON path in `.env`
@@ -294,6 +298,15 @@ Album configuration is stored in a Google Sheet with these columns:
 - Clear browser cookies and try again
 
 ## Release Notes
+
+### v1.0.5 (Sep 7, 2026)
+- **Added:** Diagnostic debug logging, gated entirely behind `APP_DEBUG=true` in `.env`
+- **Added:** `src/Logger.php` -- writes detailed step-by-step logs to `storage/logs/debug.log` (`.env` loading, Google auth validation, every Drive/Sheets API call) and renders a readable on-screen debug panel on the homepage and album page
+- **Added:** `src/ErrorSummarizer.php` -- detects when Google returns an HTML error page instead of API data and shows a short, actionable message instead of dumping the raw HTML; the full raw response is still captured in the debug log
+- **Added:** AJAX endpoints (`upload.php`, `delete.php`) include a `debug` array in their JSON response when `APP_DEBUG=true`
+- **Note:** When `APP_DEBUG=false` (the default), none of this is written to disk or shown on screen -- zero overhead and zero exposure in production
+- **How to use:** Set `APP_DEBUG=true` in `.env`, reload the page that's failing, and read the green debug panel (or `storage/logs/debug.log`) to see exactly which `.env` value or Google API call is the problem
+- **Fixed:** `session_start()` was never called anywhere, so the `$_SESSION` reads/writes used for album password verification in `album.php` silently failed (and would throw their own PHP warnings) -- now started once in `init.php`
 
 ### v1.0.4 (Sep 7, 2026)
 - **Fixed:** `.env` values were silently ignored whenever the hosting platform pre-declared the same environment variable as an empty placeholder (common with control-panel PHP env var managers) -- `isset($_ENV[$key])` was `true` for a blank value, so the real `.env` value never loaded
@@ -351,4 +364,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.4 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.5 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

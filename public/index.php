@@ -9,6 +9,7 @@ $config = require_once __DIR__ . '/init.php';
 use PCAPhotoHub\GoogleDriveManager;
 use PCAPhotoHub\GoogleSheetsManager;
 use PCAPhotoHub\AlbumManager;
+use PCAPhotoHub\Logger;
 
 try {
     $driveManager = new GoogleDriveManager($config);
@@ -17,6 +18,7 @@ try {
 
     $albums = $albumManager->getAllAlbums();
 } catch (\Exception $e) {
+    Logger::error('index.php: failed to load albums', ['message' => $e->getMessage()]);
     $error = "Error loading albums: " . $e->getMessage();
     $albums = [];
 }
@@ -62,6 +64,9 @@ try {
                     <strong>Error:</strong> <?php echo htmlspecialchars($error); ?>
                 </div>
             <?php endif; ?>
+
+            <!-- Debug Panel (only rendered when APP_DEBUG=true) -->
+            <?php echo Logger::renderHtml(); ?>
 
             <!-- Page Title -->
             <h1>Event Photo Gallery</h1>

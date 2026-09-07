@@ -4,13 +4,21 @@
  * Loads environment variables and provides application-wide configuration
  */
 
+use PCAPhotoHub\Logger;
+
+$envPath = __DIR__ . '/../.env';
+$bootLog = []; // buffered here; flushed into Logger once we know APP_DEBUG below
+
 // Load .env file if it exists
 // A hand-rolled line parser is used instead of parse_ini_file() because
 // parse_ini_file() is unreliable across PHP builds with '#' comments and
 // throws a syntax error on values/comments containing characters like
 // parentheses, colons, or unescaped quotes.
-if (file_exists(__DIR__ . '/../.env')) {
-    $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+if (file_exists($envPath)) {
+    $bootLog[] = ".env file found at: $envPath";
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $bootLog[] = 'Read ' . count($lines) . ' line(s) from .env';
+
     foreach ($lines as $line) {
         $line = trim($line);
 
@@ -42,10 +50,17 @@ if (file_exists(__DIR__ . '/../.env')) {
         // placeholders, which are "set" but useless -- .env should win
         // over those rather than be silently ignored.
         $existing = $_ENV[$key] ?? getenv($key);
-        if ($existing === false || $existing === null || $existing === '') {
+        $existingIsUsable = !($existing === false || $existing === null || $existing === '');
+
+        if ($existingIsUsable) {
+            $bootLog[] = "{$key}: a non-empty value already exists in the host environment -- keeping it, ignoring .env";
+        } else {
             $_ENV[$key] = $value;
+            $bootLog[] = "{$key}: loaded from .env" . ($value === '' ? ' [WARNING: value is empty on this line]' : '');
         }
     }
+} else {
+    $bootLog[] = ".env file NOT found at: $envPath -- relying entirely on host/webserver environment variables";
 }
 
 // Helper function to get environment variable with default
@@ -66,13 +81,50 @@ if (!function_exists('getEnvOptional')) {
     }
 }
 
+// Determine debug flag now that .env has been merged into $_ENV, and turn
+// on the diagnostic logger before resolving anything else so every step
+// below is captured. Logging is a complete no-op (no file writes, nothing
+// shown on screen) whenever APP_DEBUG is not true.
+$debugRaw = getEnvOptional('APP_DEBUG', false);
+$debugEnabled = $debugRaw === 'true' || $debugRaw === true || $debugRaw === '1';
+Logger::setEnabled($debugEnabled);
+
+foreach ($bootLog as $bootLine) {
+    Logger::debug($bootLine);
+}
+
+if ($debugEnabled) {
+    Logger::info('APP_DEBUG is enabled -- diagnostic logging active for this request');
+}
+
+// Resolve each config value individually (rather than inline in the
+// array below) so we can log what was actually found before anything
+// that's missing has a chance to throw.
+$serviceAccountJson = getEnvOptional('GOOGLE_SERVICE_ACCOUNT_JSON');
+$driveRootFolderId = getEnvOptional('GOOGLE_DRIVE_ROOT_FOLDER_ID');
+$sheetsConfigId = getEnvOptional('GOOGLE_SHEETS_CONFIG_ID');
+
+Logger::debug('Resolved GOOGLE_SERVICE_ACCOUNT_JSON', ['value' => $serviceAccountJson ?: '(empty)']);
+Logger::debug('Resolved GOOGLE_DRIVE_ROOT_FOLDER_ID', ['value' => $driveRootFolderId ?: '(empty)']);
+Logger::debug('Resolved GOOGLE_SHEETS_CONFIG_ID', ['value' => $sheetsConfigId ?: '(empty)']);
+
+if (empty($serviceAccountJson)) {
+    Logger::error('GOOGLE_SERVICE_ACCOUNT_JSON resolved to empty -- this will fail as soon as a Google API call is attempted');
+}
+if (empty($driveRootFolderId)) {
+    Logger::error('GOOGLE_DRIVE_ROOT_FOLDER_ID resolved to empty -- this will fail as soon as a Google API call is attempted');
+}
+if (empty($sheetsConfigId)) {
+    Logger::error('GOOGLE_SHEETS_CONFIG_ID resolved to empty -- this will fail as soon as a Google API call is attempted');
+}
+
 // Application Configuration
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.0.4',
+        'version' => '1.0.5',
         'release_date' => '2026-09-07',
-        'debug' => getEnvOptional('APP_DEBUG', false) === 'true' || getEnvOptional('APP_DEBUG', false) === true,
+        'debug' => $debugEnabled,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
         'timezone' => getEnvOptional('TIMEZONE', 'America/Los_Angeles'),
     ],
