@@ -1,6 +1,25 @@
+# Explicitly re-allow this directory. The project root's .htaccess (one
+# level up) denies everything by default so files like .env and the
+# Google service account JSON aren't directly downloadable when the
+# whole project sits under the web root -- this directory (the actual
+# application) must override that back to allowed.
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Allow from all
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
+
+    # No RewriteBase here on purpose: without one, Apache resolves the
+    # rewrite target (index.php) relative to whatever directory this
+    # .htaccess lives in, which is what makes this work whether the app
+    # is installed at the domain root or nested under a subdirectory
+    # (e.g. /pca-photo-hub/public/). A hardcoded "RewriteBase /" would
+    # break the subdirectory case.
 
     # Don't rewrite existing files or directories
     RewriteCond %{REQUEST_FILENAME} !-f

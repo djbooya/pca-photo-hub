@@ -1,0 +1,38 @@
+# ============================================================
+# PCA Photo Hub - Project Root Protection
+# ============================================================
+# This file matters ONLY when the whole project folder sits under the
+# web server's document root (e.g. https://example.com/pca-photo-hub/)
+# instead of the document root pointing directly at public/. In that
+# layout, without this file, .env, your Google service account JSON
+# credentials, config/, src/, storage/, and vendor/ would all be
+# directly downloadable by anyone who requests them by URL.
+#
+# Everything at this level is denied by default; only index.php (which
+# just redirects to public/, the real application) is allowed through.
+# public/ has its own .htaccess that explicitly re-allows itself.
+#
+# If your host ignores .htaccess (AllowOverride None), this file does
+# nothing -- as a second line of defense, keep .env and your service
+# account JSON outside the web-servable tree entirely if your hosting
+# panel allows it (e.g. one directory above this one).
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
+
+<Files "index.php">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Allow from all
+    </IfModule>
+</Files>
+
+Options -Indexes

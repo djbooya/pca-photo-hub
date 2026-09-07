@@ -182,6 +182,8 @@ Then visit: `http://localhost:8000`
 
 ```
 pca-photo-hub/
+├── index.php                   # Redirects to public/ (subdirectory installs)
+├── .htaccess                   # Locks down everything at this level except index.php
 ├── config/
 │   ├── config.php              # Configuration loader
 │   └── .env.example            # Environment template
@@ -190,7 +192,9 @@ pca-photo-hub/
 │   ├── GoogleSheetsManager.php  # Google Sheets API
 │   ├── AlbumManager.php         # Album logic
 │   ├── FileUploadHandler.php    # Upload validation
-│   └── SessionManager.php       # User session tracking
+│   ├── SessionManager.php       # User session tracking
+│   ├── Logger.php               # Debug logging (APP_DEBUG-gated)
+│   └── ErrorSummarizer.php      # Readable Google API error messages
 ├── public/
 │   ├── index.php               # Homepage
 │   ├── album.php               # Album detail page
@@ -303,6 +307,12 @@ If your root folder lives inside a **Shared Drive** rather than someone's person
 
 ## Release Notes
 
+### v1.1.1 (Sep 7, 2026)
+- **Added:** Subdirectory installation support -- visiting the project root (e.g. `https://yourdomain.com/pca-photo-hub/`) now redirects to `public/`, the real application, via a new root-level `index.php`. Needed on shared hosts that only let you point a domain at one fixed document root, with no way to make it `public/` inside a subfolder.
+- **Security fix:** Added a root-level `.htaccess` that denies direct access to everything except that redirect -- previously, installing the whole project under the web root (rather than pointing the document root at `public/`) meant `.env`, any service account JSON credentials file, `config/`, `src/`, `storage/`, and `vendor/` were all directly downloadable by URL to anyone who requested them.
+- **Fixed:** `public/.htaccess` hardcoded `RewriteBase /`, which resolves relative to the site's true root -- under a subdirectory install this pointed the internal rewrite at the wrong location entirely. Removed; Apache now resolves it relative to wherever `public/` actually lives.
+- **Note:** This `.htaccess`-based protection only works if your host honors `.htaccess` (`AllowOverride All`). See the new "Shared Hosting" section in `DEPLOYMENT.md` for how to verify this and for the one deployment method that protects credentials unconditionally (keeping them outside the web-servable tree).
+
 ### v1.1.0 (Sep 7, 2026)
 - **Added:** Albums configured in Google Sheets that don't yet have a matching Drive folder are now created automatically -- no more manually creating a folder for every new row in the config sheet
 - **Behavior:** A folder is only auto-created if the album's upload end date hasn't already passed (or has no end date set); an album whose window already closed before it ever got a folder is skipped rather than creating a folder nobody can use
@@ -395,4 +405,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.1.0 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.1.1 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

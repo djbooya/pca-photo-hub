@@ -171,6 +171,16 @@ server {
 }
 ```
 
+#### Shared Hosting (Can't Set a Custom Document Root)
+
+Many shared hosting control panels only let you point a domain/subdomain at a single fixed document root, with no way to make it `public/` inside a subdirectory. If you can only upload the whole project as a folder under your existing web root -- e.g. the site ends up reachable at `https://yourdomain.com/pca-photo-hub/` -- this app handles that automatically as of v1.1.1:
+
+- Visiting `https://yourdomain.com/pca-photo-hub/` redirects to `https://yourdomain.com/pca-photo-hub/public/`, the real application, via a small `index.php` at the project root.
+- The project root's `.htaccess` denies direct access to everything except that redirect file -- `.env`, `config/`, `src/`, `storage/`, `vendor/`, and any credentials file (like your service account JSON) sitting at the project root are all blocked from being fetched directly by URL.
+- `public/.htaccess` explicitly re-allows itself and no longer hardcodes a document-root-relative `RewriteBase`, so it works correctly no matter how deeply the project is nested.
+
+**Important caveat:** this protection depends on your host actually honoring `.htaccess` (`AllowOverride All` or equivalent). If your host ignores `.htaccess` files entirely, none of this applies and those files are directly downloadable regardless. The only protection method that works unconditionally is keeping `.env` and your service account JSON **outside the web-servable directory tree entirely** -- e.g. one level above wherever your hosting account's web root begins, if your control panel gives you a "private" (non-web-accessible) storage area. Point `GOOGLE_SERVICE_ACCOUNT_JSON` in `.env` at that path. If your host has no such option, verify `.htaccess` is honored (upload the project, then try requesting `https://yourdomain.com/pca-photo-hub/.env` directly in a browser -- it should return a 403, not the file's contents) before treating the deployment as safe.
+
 ### 5. Install SSL Certificate
 
 Use Let's Encrypt for free SSL:
