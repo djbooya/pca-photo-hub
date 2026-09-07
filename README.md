@@ -295,6 +295,11 @@ Album configuration is stored in a Google Sheet with these columns:
 
 ## Release Notes
 
+### v1.0.4 (Sep 7, 2026)
+- **Fixed:** `.env` values were silently ignored whenever the hosting platform pre-declared the same environment variable as an empty placeholder (common with control-panel PHP env var managers) -- `isset($_ENV[$key])` was `true` for a blank value, so the real `.env` value never loaded
+- **Fixed:** `.env` values now take precedence over any existing environment entry that is empty, `false`, or unset; only a genuinely non-empty pre-existing value is left alone
+- **Symptom this fixes:** `GOOGLE_SERVICE_ACCOUNT_JSON is not set in .env` even though the `.env` file has a correct, non-empty value on that line
+
 ### v1.0.3 (Sep 7, 2026)
 - **Fixed:** `.env` parsing no longer uses `parse_ini_file()`, which threw "syntax error, unexpected '('" on comment lines containing parentheses (e.g. `# ...(download from Google Cloud Console)`) and silently broke every config value on failure
 - **Fixed:** Replaced with a hand-rolled line parser that safely skips `#`/`;` comments and handles special characters, colons, and quoted values in `.env`
@@ -346,4 +351,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.3 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.4 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

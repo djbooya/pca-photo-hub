@@ -32,7 +32,17 @@ if (file_exists(__DIR__ . '/../.env')) {
             }
         }
 
-        if ($key !== '' && !isset($_ENV[$key])) {
+        if ($key === '') {
+            continue;
+        }
+
+        // Only skip loading from .env if this key already has a genuinely
+        // non-empty value (e.g. a real value set by the hosting panel or
+        // php-fpm pool). Some hosts pre-declare env vars as blank
+        // placeholders, which are "set" but useless -- .env should win
+        // over those rather than be silently ignored.
+        $existing = $_ENV[$key] ?? getenv($key);
+        if ($existing === false || $existing === null || $existing === '') {
             $_ENV[$key] = $value;
         }
     }
@@ -60,7 +70,7 @@ if (!function_exists('getEnvOptional')) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.0.3',
+        'version' => '1.0.4',
         'release_date' => '2026-09-07',
         'debug' => getEnvOptional('APP_DEBUG', false) === 'true' || getEnvOptional('APP_DEBUG', false) === true,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),
