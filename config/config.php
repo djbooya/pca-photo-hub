@@ -5,10 +5,34 @@
  */
 
 // Load .env file if it exists
+// A hand-rolled line parser is used instead of parse_ini_file() because
+// parse_ini_file() is unreliable across PHP builds with '#' comments and
+// throws a syntax error on values/comments containing characters like
+// parentheses, colons, or unescaped quotes.
 if (file_exists(__DIR__ . '/../.env')) {
-    $env_vars = parse_ini_file(__DIR__ . '/../.env');
-    foreach ($env_vars as $key => $value) {
-        if (!isset($_ENV[$key])) {
+    $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $line = trim($line);
+
+        // Skip comments (# or ;) and lines without an '='
+        if ($line === '' || $line[0] === '#' || $line[0] === ';' || strpos($line, '=') === false) {
+            continue;
+        }
+
+        list($key, $value) = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+
+        // Strip matching surrounding quotes, if present
+        if (strlen($value) >= 2) {
+            $first = $value[0];
+            $last = $value[strlen($value) - 1];
+            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+                $value = substr($value, 1, -1);
+            }
+        }
+
+        if ($key !== '' && !isset($_ENV[$key])) {
             $_ENV[$key] = $value;
         }
     }
@@ -36,7 +60,7 @@ if (!function_exists('getEnvOptional')) {
 return [
     'app' => [
         'name' => getEnvOptional('APP_NAME', 'PCA Photo Hub'),
-        'version' => '1.0.2',
+        'version' => '1.0.3',
         'release_date' => '2026-09-07',
         'debug' => getEnvOptional('APP_DEBUG', false) === 'true' || getEnvOptional('APP_DEBUG', false) === true,
         'base_url' => getEnvOptional('BASE_URL', 'http://localhost:8000'),

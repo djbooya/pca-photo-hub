@@ -295,6 +295,11 @@ Album configuration is stored in a Google Sheet with these columns:
 
 ## Release Notes
 
+### v1.0.3 (Sep 7, 2026)
+- **Fixed:** `.env` parsing no longer uses `parse_ini_file()`, which threw "syntax error, unexpected '('" on comment lines containing parentheses (e.g. `# ...(download from Google Cloud Console)`) and silently broke every config value on failure
+- **Fixed:** Replaced with a hand-rolled line parser that safely skips `#`/`;` comments and handles special characters, colons, and quoted values in `.env`
+- **Fixed:** `date_default_timezone_set()` now falls back to `America/Los_Angeles` if the timezone config is empty, instead of throwing a notice for an invalid empty timezone ID
+
 ### v1.0.2 (Sep 7, 2026)
 - **Fixed:** Service account JSON is now validated (exists, readable, valid JSON, has required fields) before being handed to the Google client
 - **Fixed:** Previously a bad/missing credentials path failed silently inside the Google API client, producing "Trying to access array offset on false" warnings and a broken auth request that Google redirected to an HTML error page instead of a clean API error
@@ -341,4 +346,4 @@ For issues or questions, contact the Diablo Region PCA administrators.
 
 ---
 
-**Version:** 1.0.2 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅
+**Version:** 1.0.3 | **Last Updated:** Sep 7, 2026 | **Status:** Production Ready ✅

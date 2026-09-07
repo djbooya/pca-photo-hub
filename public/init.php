@@ -16,8 +16,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $config = require_once __DIR__ . '/../config/config.php';
 
 // Set timezone
-if (isset($config['app']['timezone'])) {
+if (!empty($config['app']['timezone'])) {
     date_default_timezone_set($config['app']['timezone']);
+} else {
+    date_default_timezone_set('America/Los_Angeles');
 }
 
 // Set error log file
